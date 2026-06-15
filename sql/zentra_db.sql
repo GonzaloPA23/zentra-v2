@@ -1,0 +1,925 @@
+-- phpMyAdmin SQL Dump
+-- version 5.0.1
+-- https://www.phpmyadmin.net/
+--
+-- Servidor: 127.0.0.1
+-- Tiempo de generación: 23-04-2026 a las 21:08:39
+-- Versión del servidor: 10.4.11-MariaDB
+-- Versión de PHP: 7.4.3
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+SET AUTOCOMMIT = 0;
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Base de datos: `zentra_db`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `almacenes`
+--
+
+CREATE TABLE `almacenes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `ciudad_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(120) NOT NULL,
+  `direccion` varchar(255) DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `almacenes`
+--
+
+INSERT INTO `almacenes` (`id`, `ciudad_id`, `nombre`, `direccion`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 1, 'ALMACEN TRES REGIONES', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(2, 1, 'ALMACEN HUAMANTANGA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(3, 1, 'ALMACEN BELAUNDE', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(4, 1, 'ALMACEN UNICACHI NORTE', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(5, 1, 'ALMACEN FIORI', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(6, 1, 'ALMACEN CAQUETA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(7, 1, 'ALMACEN AYACUCHO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(8, 1, 'ALMACEN LA PARADA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(9, 1, 'ALMACEN PRODUCTORES', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(10, 1, 'ALMACEN CIUDAD DE DIOS', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(11, 1, 'ALMACEN UNICACHI SUR', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(12, 2, 'ALMACEN CHICLAYO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(13, 3, 'ALMACEN TRUJILLO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(14, 4, 'ALMACEN PIURA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(15, 5, 'ALMACEN AREQUIPA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(16, 6, 'ALMACEN JULIACA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(17, 7, 'ALMACEN CUSCO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(18, 8, 'ALMACEN AYACUCHO SUR', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(19, 9, 'ALMACEN TACNA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(20, 10, 'ALMACEN PUCALLPA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(21, 11, 'ALMACEN IQUITOS', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(22, 12, 'ALMACEN JAEN', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(23, 13, 'ALMACEN HUANUCO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(24, 14, 'ALMACEN HUANCAYO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(25, 15, 'ALMACEN TARMA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(26, 16, 'ALMACEN ICA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(27, 17, 'ALMACEN HUARAZ', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(28, 18, 'ALMACEN HUACHO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `audit_log`
+--
+
+CREATE TABLE `audit_log` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED DEFAULT NULL,
+  `usuario_id` int(10) UNSIGNED DEFAULT NULL,
+  `accion` varchar(80) NOT NULL,
+  `tabla` varchar(80) NOT NULL,
+  `registro_id` int(10) UNSIGNED DEFAULT NULL,
+  `detalle` text DEFAULT NULL,
+  `ip` varchar(45) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `audit_log`
+--
+
+INSERT INTO `audit_log` (`id`, `empresa_id`, `usuario_id`, `accion`, `tabla`, `registro_id`, `detalle`, `ip`, `created_at`) VALUES
+(1, 1, 2, 'CREATE', 'registros', 1, NULL, '::1', '2026-04-15 14:52:58'),
+(2, 1, 2, 'CREATE', 'registros', 2, NULL, '::1', '2026-04-15 22:19:28'),
+(3, 1, 5, 'CREATE', 'registros', 3, NULL, '::1', '2026-04-16 18:51:17'),
+(4, 1, 5, 'STATUS_CHANGE', 'registros', 3, '{\"summary\":\"Cambio el estado a en_transito\",\"from\":\"pendiente\",\"to\":\"en_transito\"}', '::1', '2026-04-16 19:42:43'),
+(5, 1, 3, 'STATUS_CHANGE', 'registros', 3, '{\"summary\":\"Cambio el estado a aprobado\",\"from\":\"en_transito\",\"to\":\"aprobado\"}', '::1', '2026-04-16 19:44:03');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `categorias`
+--
+
+CREATE TABLE `categorias` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(100) NOT NULL,
+  `descripcion` text DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `categorias`
+--
+
+INSERT INTO `categorias` (`id`, `empresa_id`, `nombre`, `descripcion`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 1, 'ABARROTES', NULL, 1, '2026-04-15 14:02:40', '2026-04-16 19:52:44'),
+(2, 1, 'CONFITES', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(3, 1, 'MASCOTAS', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(4, 1, 'PANETONES', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(5, 1, 'DEGUSTACION ALIMENTOS', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(6, 1, 'FANNY', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(7, 1, 'FRUGELE MIX', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(8, 1, 'TODINNO', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(9, 1, 'SIN CATEGORIA', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:07:02');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `ciudades`
+--
+
+CREATE TABLE `ciudades` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `region_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(80) NOT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `ciudades`
+--
+
+INSERT INTO `ciudades` (`id`, `region_id`, `nombre`, `activo`, `created_at`) VALUES
+(1, 1, 'LIMA', 1, '2026-04-15 14:02:40'),
+(2, 2, 'CHICLAYO', 1, '2026-04-15 14:02:40'),
+(3, 2, 'TRUJILLO', 1, '2026-04-15 14:02:40'),
+(4, 2, 'PIURA', 1, '2026-04-15 14:02:40'),
+(5, 3, 'AREQUIPA', 1, '2026-04-15 14:02:40'),
+(6, 3, 'JULIACA', 1, '2026-04-15 14:02:40'),
+(7, 3, 'CUSCO', 1, '2026-04-15 14:02:40'),
+(8, 3, 'AYACUCHO', 1, '2026-04-15 14:02:40'),
+(9, 3, 'TACNA', 1, '2026-04-15 14:02:40'),
+(10, 4, 'PUCALLPA', 1, '2026-04-15 14:02:40'),
+(11, 4, 'IQUITOS', 1, '2026-04-15 14:02:40'),
+(12, 4, 'JAEN', 1, '2026-04-15 14:02:40'),
+(13, 4, 'HUANUCO', 1, '2026-04-15 14:02:40'),
+(14, 5, 'HUANCAYO', 1, '2026-04-15 14:02:40'),
+(15, 5, 'TARMA', 1, '2026-04-15 14:02:40'),
+(16, 5, 'ICA', 1, '2026-04-15 14:02:40'),
+(17, 5, 'HUARAZ', 1, '2026-04-15 14:02:40'),
+(18, 5, 'HUACHO', 1, '2026-04-15 14:02:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `empresas`
+--
+
+CREATE TABLE `empresas` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(120) NOT NULL,
+  `ruc` varchar(20) DEFAULT NULL,
+  `logo` varchar(255) DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `empresas`
+--
+
+INSERT INTO `empresas` (`id`, `nombre`, `ruc`, `logo`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 'ZENTRA ALMACENES', '20123456789', NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `indicadores`
+--
+
+CREATE TABLE `indicadores` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(100) NOT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `indicadores`
+--
+
+INSERT INTO `indicadores` (`id`, `empresa_id`, `nombre`, `activo`, `created_at`) VALUES
+(1, 1, 'DISGREGACIÓN', 1, '2026-04-15 14:02:40'),
+(2, 1, 'EJECUCIÓN DE CAMPO', 1, '2026-04-15 14:02:40'),
+(3, 1, 'TG - ALMACENES', 1, '2026-04-15 14:02:40'),
+(4, 1, 'TG - MOLITALIA', 1, '2026-04-15 14:02:40'),
+(5, 1, 'TG - MERCADO DE ABASTO', 1, '2026-04-15 14:02:40'),
+(6, 1, 'TG - MARKETING ALTERNO', 1, '2026-04-15 14:02:40'),
+(7, 1, 'PRÉSTAMO DE MERCADERÍA', 1, '2026-04-15 14:02:40'),
+(8, 1, 'DEVOLUCION DE PRÉSTAMO', 1, '2026-04-15 14:02:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `lotes`
+--
+
+CREATE TABLE `lotes` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `sku_id` int(10) UNSIGNED NOT NULL,
+  `codigo_lote` varchar(80) NOT NULL,
+  `fecha_vencimiento` date DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `lotes`
+--
+
+INSERT INTO `lotes` (`id`, `sku_id`, `codigo_lote`, `fecha_vencimiento`, `activo`, `created_at`) VALUES
+(1, 24, 'LOTE-001', '2026-04-09', 1, '2026-04-15 14:51:44'),
+(2, 1, 'LOTE-002', '2026-04-20', 1, '2026-04-15 22:17:44');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `personal_receptor`
+--
+
+CREATE TABLE `personal_receptor` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(150) NOT NULL,
+  `cargo` varchar(100) DEFAULT NULL,
+  `almacen_id` int(10) UNSIGNED DEFAULT NULL,
+  `categoria_id` int(10) UNSIGNED DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `personal_receptor`
+--
+
+INSERT INTO `personal_receptor` (`id`, `empresa_id`, `nombre`, `cargo`, `almacen_id`, `categoria_id`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 1, 'ALMACENERO PRINCIPAL', 'Almacenero', 28, 1, 1, '2026-04-15 14:02:40', '2026-04-16 18:35:08'),
+(2, 1, 'SUPERVISOR REGIONAL', 'Supervisor', NULL, NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(3, 1, 'JEFE DE ALMACEN', 'Jefe', NULL, NULL, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(4, 1, 'JEFE SUPERVISOR', NULL, NULL, NULL, 1, '2026-04-15 22:26:32', '2026-04-15 22:26:32'),
+(5, 1, 'jefe', NULL, 1, 1, 1, '2026-04-16 18:37:25', '2026-04-16 18:37:25');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `regiones`
+--
+
+CREATE TABLE `regiones` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(80) NOT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `regiones`
+--
+
+INSERT INTO `regiones` (`id`, `empresa_id`, `nombre`, `activo`, `created_at`) VALUES
+(1, 1, 'LIMA', 1, '2026-04-15 14:02:40'),
+(2, 1, 'NORTE', 1, '2026-04-15 14:02:40'),
+(3, 1, 'SUR', 1, '2026-04-15 14:02:40'),
+(4, 1, 'ORIENTE', 1, '2026-04-15 14:02:40'),
+(5, 1, 'CENTRO', 1, '2026-04-15 14:02:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `registros`
+--
+
+CREATE TABLE `registros` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED NOT NULL,
+  `almacen_origen_id` int(10) UNSIGNED NOT NULL,
+  `almacen_destino_id` int(10) UNSIGNED DEFAULT NULL,
+  `usuario_id` int(10) UNSIGNED NOT NULL,
+  `fecha` date NOT NULL,
+  `ciudad_id` int(10) UNSIGNED NOT NULL,
+  `categoria_id` int(10) UNSIGNED NOT NULL,
+  `accion` enum('MERMA','DESPACHO A CANJISTAS','OTROS MOVIMIENTOS') NOT NULL,
+  `tipo_accion` enum('ENTRADA','SALIDA','DEGUSTACIÓN','CANJES','CRUCERISMO','MERCADERISMO','ACTIVOS') NOT NULL,
+  `personal_receptor_id` int(10) UNSIGNED DEFAULT NULL,
+  `indicador_id` int(10) UNSIGNED DEFAULT NULL,
+  `tipo_mercaderia_id` int(10) UNSIGNED DEFAULT NULL,
+  `sku_id` int(10) UNSIGNED NOT NULL,
+  `lote_id` int(10) UNSIGNED DEFAULT NULL,
+  `fecha_vencimiento` date DEFAULT NULL,
+  `cantidad` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `nro_guia` varchar(80) DEFAULT NULL,
+  `foto_guia` varchar(255) DEFAULT NULL,
+  `observaciones` text DEFAULT NULL,
+  `estado` enum('pendiente','en_transito','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',
+  `aprobado_por` int(10) UNSIGNED DEFAULT NULL,
+  `fecha_aprobacion` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `registros`
+--
+
+INSERT INTO `registros` (`id`, `empresa_id`, `almacen_origen_id`, `almacen_destino_id`, `usuario_id`, `fecha`, `ciudad_id`, `categoria_id`, `accion`, `tipo_accion`, `personal_receptor_id`, `indicador_id`, `tipo_mercaderia_id`, `sku_id`, `lote_id`, `fecha_vencimiento`, `cantidad`, `nro_guia`, `foto_guia`, `observaciones`, `estado`, `aprobado_por`, `fecha_aprobacion`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 18, 2, '2026-04-15', 1, 1, 'MERMA', 'ENTRADA', 1, NULL, 2, 24, 1, '2026-04-09', '20.00', 'G-232323', '1776264778926-92981924.pdf', NULL, 'aprobado', 2, '2026-04-15 17:11:08', '2026-04-15 14:52:58', '2026-04-15 22:11:08'),
+(2, 1, 1, 5, 2, '2026-04-15', 1, 1, 'MERMA', 'ENTRADA', 1, 4, 1, 1, 2, '2026-04-20', '30.00', 'G-001', NULL, NULL, 'aprobado', 2, '2026-04-15 17:20:02', '2026-04-15 22:19:28', '2026-04-15 22:20:02'),
+(3, 1, 28, 26, 5, '2026-04-16', 18, 1, 'MERMA', 'ENTRADA', 1, 8, 2, 135, NULL, NULL, '35.00', 'G-001', '1776365477697-633790466.pdf', 'ESTO ES UNA PRUEBA', 'aprobado', 3, '2026-04-16 14:44:03', '2026-04-16 18:51:17', '2026-04-16 19:44:03');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `skus`
+--
+
+CREATE TABLE `skus` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED NOT NULL,
+  `categoria_id` int(10) UNSIGNED NOT NULL,
+  `tipo_mercaderia_id` int(10) UNSIGNED DEFAULT NULL,
+  `zona` enum('LIMA','PROVINCIA') NOT NULL DEFAULT 'LIMA',
+  `codigo` varchar(80) DEFAULT NULL,
+  `nombre` varchar(255) NOT NULL,
+  `unidad` varchar(40) DEFAULT NULL,
+  `tiene_lote` tinyint(1) NOT NULL DEFAULT 0,
+  `tiene_vencimiento` tinyint(1) NOT NULL DEFAULT 0,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `skus`
+--
+
+INSERT INTO `skus` (`id`, `empresa_id`, `categoria_id`, `tipo_mercaderia_id`, `zona`, `codigo`, `nombre`, `unidad`, `tiene_lote`, `tiene_vencimiento`, `activo`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 1, 'LIMA', NULL, 'AFICHE ENMICADO ABARROTES', 'kg', 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:37:18'),
+(2, 1, 1, 1, 'LIMA', NULL, 'AFICHE ENMICADO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(3, 1, 1, 1, 'LIMA', NULL, 'BANDEJA FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(4, 1, 1, 1, 'LIMA', NULL, 'BOLSA FANNY PEQUEÑA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(5, 1, 1, 1, 'LIMA', NULL, 'BUFANDA COSTA ROJA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(6, 1, 1, 1, 'LIMA', NULL, 'COCHE FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(7, 1, 1, 1, 'LIMA', NULL, 'FUNDA ROJO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(8, 1, 1, 1, 'LIMA', NULL, 'FUNDA VERDE FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(9, 1, 1, 1, 'LIMA', NULL, 'GORRO NAVIDEÑO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(10, 1, 1, 1, 'LIMA', NULL, 'GORRO ROJO FANY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(11, 1, 1, 1, 'LIMA', NULL, 'GORRO ROJO MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(12, 1, 1, 1, 'LIMA', NULL, 'GORRO VERDE ABARROTES', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(13, 1, 1, 1, 'LIMA', NULL, 'MANDIL COSTA VERDE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(14, 1, 1, 1, 'LIMA', NULL, 'MOCHILA CARTEL FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(15, 1, 1, 1, 'LIMA', NULL, 'POLO BLANCO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(16, 1, 1, 1, 'LIMA', NULL, 'POLO BLANCO MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(17, 1, 1, 1, 'LIMA', NULL, 'POLO RAYADO MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(18, 1, 1, 1, 'LIMA', NULL, 'POLO ROJO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(19, 1, 1, 1, 'LIMA', NULL, 'POLO VERDE ABARROTES', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(20, 1, 1, 1, 'LIMA', NULL, 'POLO VERDE FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(21, 1, 1, 1, 'LIMA', NULL, 'SERVILLETA(PAQUETE)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(22, 1, 1, 1, 'LIMA', NULL, 'SOMBRILLA POMAROLA VERDE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(23, 1, 1, 1, 'LIMA', NULL, 'VASO PLASTIFICADO ROJO TRES OSITOS', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(24, 1, 1, 2, 'LIMA', NULL, 'ATUN EN TROZOS FANNY 140 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(25, 1, 1, 2, 'LIMA', NULL, 'AVENA 3 OSITOS CLASICA 24X100GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(26, 1, 1, 2, 'LIMA', NULL, 'AVENA 3 OSITOS QUINUA 12X150GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(27, 1, 1, 2, 'LIMA', NULL, 'MOLITALIA FIDEO MACARRON 235GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(28, 1, 1, 2, 'LIMA', NULL, 'MOLITALIA FIDEO SPAGHETTI 450GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(29, 1, 1, 2, 'LIMA', NULL, 'MOLITALIA FIDEO TORNILLO 235GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(30, 1, 1, 3, 'LIMA', NULL, 'AFICHES FANNY DELI FRESA X PAQUETE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(31, 1, 1, 3, 'LIMA', NULL, 'AVENA 3 OSITOS CANELA 24X100GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(32, 1, 1, 3, 'LIMA', NULL, 'HARINA PREPARADA 150GR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(33, 1, 1, 3, 'LIMA', NULL, 'JARRA CON TAPA 1L', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(34, 1, 1, 3, 'LIMA', NULL, 'MOLITALIA POMAROLA SALSA CLASICA 145GR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(35, 1, 1, 3, 'LIMA', NULL, 'TAPPER FANNY PESCADO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(36, 1, 1, 3, 'LIMA', NULL, 'TAPPER FANNY REDONDO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(37, 1, 1, 3, 'LIMA', NULL, 'TAPPER TRES OSITOS CUADRADO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(38, 1, 2, 4, 'LIMA', NULL, 'AFICHE PLASTIFICADO CONFITES', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(39, 1, 2, 4, 'LIMA', NULL, 'AFICHE PLASTIFICADO CRUCERISTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(40, 1, 2, 4, 'LIMA', NULL, 'ANFORA CRUCERISTA (CARTON)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(41, 1, 2, 4, 'LIMA', NULL, 'BANDEJA COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(42, 1, 2, 4, 'LIMA', NULL, 'BANDEJA COSTA CHOCMAN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(43, 1, 2, 4, 'LIMA', NULL, 'BANDEJA DE DEGUSTACION GRANDE VIZZIO', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(44, 1, 2, 4, 'LIMA', NULL, 'CANGURO COSTA AMBROSOLI (CRUCERISTA)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(45, 1, 2, 4, 'LIMA', NULL, 'CANGURO FLAMIN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(46, 1, 2, 4, 'LIMA', NULL, 'CASACA ROJA MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(47, 1, 2, 4, 'LIMA', NULL, 'CHALECO COSTA AMBROSOLI (CRUCERISTA)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(48, 1, 2, 4, 'LIMA', NULL, 'COOLER AZUL COSTA (TECNOPOR MEDIANO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(49, 1, 2, 4, 'LIMA', NULL, 'COOLER ROJO COSTA (PLASTICO PEQUEÑO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(50, 1, 2, 4, 'LIMA', NULL, 'DADO VIZZIO', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(51, 1, 2, 4, 'LIMA', NULL, 'FLIPPER COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(52, 1, 2, 4, 'LIMA', NULL, 'FUNDA AMBROSOLI', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(53, 1, 2, 4, 'LIMA', NULL, 'FUNDA ROJO COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(54, 1, 2, 4, 'LIMA', NULL, 'GORRO AMARILLO COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(55, 1, 2, 4, 'LIMA', NULL, 'GORRO AZUL COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(56, 1, 2, 4, 'LIMA', NULL, 'GORRO CHOCMAN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(57, 1, 2, 4, 'LIMA', NULL, 'GORRO ROJO COSTA AMBROSOLI', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(58, 1, 2, 4, 'LIMA', NULL, 'MOCHILA CARTEL COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(59, 1, 2, 4, 'LIMA', NULL, 'MOCHILA CARTEL VIZZIO', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(60, 1, 2, 4, 'LIMA', NULL, 'POLO AMARILLO COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(61, 1, 2, 4, 'LIMA', NULL, 'POLO AZUL CHOCMAN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(62, 1, 2, 4, 'LIMA', NULL, 'POLO COSTA AZUL', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(63, 1, 2, 4, 'LIMA', NULL, 'POLO MORADO AMBROSOLI', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(64, 1, 2, 4, 'LIMA', NULL, 'POLO ROJO CONFITES', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(65, 1, 2, 4, 'LIMA', NULL, 'RULETA COSTA MECANO FRESA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(66, 1, 2, 4, 'LIMA', NULL, 'RULETA MECANO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(67, 1, 2, 5, 'LIMA', NULL, 'BIZCOCHO CHOCMAN 20% MAS 33.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(68, 1, 2, 5, 'LIMA', NULL, 'CARAMELO BLANDO OH 6.2GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(69, 1, 2, 5, 'LIMA', NULL, 'CARAMELO FULL MASTICRUNCH LIMON 13.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(70, 1, 2, 5, 'LIMA', NULL, 'CARAMELO MENTITAS 21GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(71, 1, 2, 5, 'LIMA', NULL, 'CHUPETIN COLORADO', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(72, 1, 2, 5, 'LIMA', NULL, 'CHOCOLATE CAÑONAZO REGULAR 19GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(73, 1, 2, 5, 'LIMA', NULL, 'CHOCOLATE MECANO MANJAR 19GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(74, 1, 2, 5, 'LIMA', NULL, 'FRUNA JIRAFA 16.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(75, 1, 2, 5, 'LIMA', NULL, 'GALLETA CARITAS 44.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(76, 1, 2, 5, 'LIMA', NULL, 'GALLETA CHOCMAN 40GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(77, 1, 2, 5, 'LIMA', NULL, 'GALLETA FRAC CLASICA 41GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(78, 1, 2, 5, 'LIMA', NULL, 'GALLETA SODA LINE 40GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(79, 1, 2, 5, 'LIMA', NULL, 'GRETEL CHOCOLATE 32 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(80, 1, 2, 5, 'LIMA', NULL, 'GRETEL FRESA 32 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(81, 1, 2, 5, 'LIMA', NULL, 'VIZZIO GRAGEA ALMENDRA 21GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(82, 1, 2, 5, 'LIMA', NULL, 'VIZZIO GRAGEA CEREAL 21GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(83, 1, 2, 5, 'LIMA', NULL, 'VIZZIO GRAGEA MANI 21GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(84, 1, 2, 5, 'LIMA', NULL, 'VIZZIO TABLETA ALMENDRA 26GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(85, 1, 2, 5, 'LIMA', NULL, 'WAFER NIK VAINILLA 27GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(86, 1, 2, 5, 'LIMA', NULL, 'WAFER TUYO 22GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(87, 1, 3, 9, 'LIMA', NULL, 'AFICHE PASTIFICADO MASCOTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(88, 1, 3, 9, 'LIMA', NULL, 'BANNER ROOLER MMK GATO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(89, 1, 3, 9, 'LIMA', NULL, 'CASACA MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(90, 1, 3, 9, 'LIMA', NULL, 'FUNDA MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(91, 1, 3, 9, 'LIMA', NULL, 'GORRO MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(92, 1, 3, 9, 'LIMA', NULL, 'POLO MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(93, 1, 3, 9, 'LIMA', NULL, 'RULETA ZEUS', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(94, 1, 3, 9, 'LIMA', NULL, 'TABLERO MADERA MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(95, 1, 3, 10, 'LIMA', NULL, 'AGENDA MIMASKOT', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(96, 1, 3, 10, 'LIMA', NULL, 'ARENA AGLUTINANTE MIMASKOT 20KG', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(97, 1, 3, 10, 'LIMA', NULL, 'FRISBEE MIMASKOT', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(98, 1, 3, 10, 'LIMA', NULL, 'MORDEDOR MIMASKOT PERRO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(99, 1, 3, 10, 'LIMA', NULL, 'PLATO MIMASKOT GATO (ANARANJADO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(100, 1, 3, 10, 'LIMA', NULL, 'PLATO MIMASKOT PERRO (ANARANJADO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(101, 1, 3, 10, 'LIMA', NULL, 'PLATO NUTRICAN GATO (ROJO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(102, 1, 3, 10, 'LIMA', NULL, 'PLATO NUTRICAN PERRO (ROJO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(103, 1, 3, 10, 'LIMA', NULL, 'VASO MEDIDOR MIMASKOT 150GR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(104, 1, 8, 18, 'LIMA', NULL, 'BANDEJA TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(105, 1, 8, 18, 'LIMA', NULL, 'CARTEL ENMICADO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(106, 1, 8, 18, 'LIMA', NULL, 'CHALECO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(107, 1, 8, 18, 'LIMA', NULL, 'COCHE TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(108, 1, 8, 18, 'LIMA', NULL, 'FUNDA COCHE TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(109, 1, 8, 18, 'LIMA', NULL, 'GORRO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(110, 1, 8, 18, 'LIMA', NULL, 'MANDIL TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(111, 1, 8, 18, 'LIMA', NULL, 'POLO CUELLO CAMISERO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(112, 1, 8, 18, 'LIMA', NULL, 'POLO CUELLO REDONDO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(113, 1, 8, 19, 'LIMA', NULL, 'BATEA TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(114, 1, 1, 1, 'PROVINCIA', NULL, 'AFICHE ENMICADO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(115, 1, 1, 1, 'PROVINCIA', NULL, 'BOLSA ROJO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(116, 1, 1, 1, 'PROVINCIA', NULL, 'COCHE CANASTERIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(117, 1, 1, 1, 'PROVINCIA', NULL, 'COCHE FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(118, 1, 1, 1, 'PROVINCIA', NULL, 'FORRO COCHE FANNY ROJO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(119, 1, 1, 1, 'PROVINCIA', NULL, 'GORRO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(120, 1, 1, 1, 'PROVINCIA', NULL, 'GORRO ROJO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(121, 1, 1, 1, 'PROVINCIA', NULL, 'MOCHILA CARTEL FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(122, 1, 1, 1, 'PROVINCIA', NULL, 'POLO FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(123, 1, 1, 1, 'PROVINCIA', NULL, 'POLO VERDE MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(124, 1, 1, 1, 'PROVINCIA', NULL, 'RULETA FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(125, 1, 1, 2, 'PROVINCIA', NULL, 'ATUN EN TROZOS FANNY 140 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(126, 1, 1, 2, 'PROVINCIA', NULL, 'ATUN FILETE ACEITE VEGETAL 48X140 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(127, 1, 1, 2, 'PROVINCIA', NULL, 'AVENA 3 OSITOS CANELA 24X100GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(128, 1, 1, 2, 'PROVINCIA', NULL, 'AVENA 3 OSITOS CLASICA 24X100GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(129, 1, 1, 2, 'PROVINCIA', NULL, 'FANNY DELIFRESA 9X12X95GR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(130, 1, 1, 2, 'PROVINCIA', NULL, 'MERMELADA FANNY 950GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(131, 1, 1, 2, 'PROVINCIA', NULL, 'MOLITALIA FIDEO CANUTO 235 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(132, 1, 1, 2, 'PROVINCIA', NULL, 'MOLITALIA FIDEO MACARRON 235GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(133, 1, 1, 2, 'PROVINCIA', NULL, 'MOLITALIA FIDEO SPAGHETTI 450GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(134, 1, 1, 2, 'PROVINCIA', NULL, 'MOLITALIA FIDEO TORNILLO 235GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(135, 1, 1, 2, 'PROVINCIA', NULL, 'MOLITALIA POMAROLA SALSA CLASICA 145GR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(136, 1, 2, 4, 'PROVINCIA', NULL, 'AFICHE A1 MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(137, 1, 2, 4, 'PROVINCIA', NULL, 'AFICHE AMBROSOLI', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(138, 1, 2, 4, 'PROVINCIA', NULL, 'AFICHE CRUCERISTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(139, 1, 2, 4, 'PROVINCIA', NULL, 'BANDEJA DE DEGUSTACION VIZZIO', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(140, 1, 2, 4, 'PROVINCIA', NULL, 'BOLSA BLANCA COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(141, 1, 2, 4, 'PROVINCIA', NULL, 'CASACA CHOCMAN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(142, 1, 2, 4, 'PROVINCIA', NULL, 'CASACA MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(143, 1, 2, 4, 'PROVINCIA', NULL, 'CASACA MULTIMARCA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(144, 1, 2, 4, 'PROVINCIA', NULL, 'COCHE LINEA MORADA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(145, 1, 2, 4, 'PROVINCIA', NULL, 'COCHE MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(146, 1, 2, 4, 'PROVINCIA', NULL, 'COOLER CHICO COSTA PLASTIFICADO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(147, 1, 2, 4, 'PROVINCIA', NULL, 'COOLER COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(148, 1, 2, 4, 'PROVINCIA', NULL, 'GORRO CHOCMAN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(149, 1, 2, 4, 'PROVINCIA', NULL, 'GORRO COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(150, 1, 2, 4, 'PROVINCIA', NULL, 'GORRO LINEA MORADA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(151, 1, 2, 4, 'PROVINCIA', NULL, 'GORRO MULTIMARCA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(152, 1, 2, 4, 'PROVINCIA', NULL, 'MOCHILA CARTEL', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(153, 1, 2, 4, 'PROVINCIA', NULL, 'POLO CHOCMAN', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(154, 1, 2, 4, 'PROVINCIA', NULL, 'POLO COSTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(155, 1, 2, 4, 'PROVINCIA', NULL, 'POLO MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(156, 1, 2, 4, 'PROVINCIA', NULL, 'POLO MULTIMARCA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(157, 1, 2, 4, 'PROVINCIA', NULL, 'RULETA MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(158, 1, 2, 4, 'PROVINCIA', NULL, 'RULETA MULTIMARCA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(159, 1, 2, 5, 'PROVINCIA', NULL, 'BARQUILLO OBSESION CLASICO 9X12X21GR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(160, 1, 2, 5, 'PROVINCIA', NULL, 'BIZCOCHO CANCUN 6X33GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(161, 1, 2, 5, 'PROVINCIA', NULL, 'BIZCOCHO CHOCMAN 20% MAS 33.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(162, 1, 2, 5, 'PROVINCIA', NULL, 'BIZCOCHO POKEKE COSTA 33GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(163, 1, 2, 5, 'PROVINCIA', NULL, 'CARAMELO BLANDO OH 6.2GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(164, 1, 2, 5, 'PROVINCIA', NULL, 'CARAMELO FULL MASTICRUNCH LIMON 13.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(165, 1, 2, 5, 'PROVINCIA', NULL, 'CARAMELO MENTITAS MASTICRUNCH 13.5GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(166, 1, 2, 5, 'PROVINCIA', NULL, 'CHOCOLATE CAÑONAZO REGULAR 19GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(167, 1, 2, 5, 'PROVINCIA', NULL, 'CHOCOLATE MECANO MANJAR 19GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(168, 1, 2, 5, 'PROVINCIA', NULL, 'GALLETA AGUA LINE COSTA', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(169, 1, 2, 5, 'PROVINCIA', NULL, 'GALLETA CHOCODONUTS BLANCA 14X6X83GR.', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(170, 1, 2, 5, 'PROVINCIA', NULL, 'GALLETA SODA LINE 40GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(171, 1, 2, 5, 'PROVINCIA', NULL, 'GRETEL CHOCOLATE 32 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(172, 1, 2, 5, 'PROVINCIA', NULL, 'GRETEL FRESA 32 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(173, 1, 2, 5, 'PROVINCIA', NULL, 'VIZZIO GRAGEA ALMENDRA 21GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(174, 1, 2, 5, 'PROVINCIA', NULL, 'VIZZIO TABLETA ALMENDRA 26GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(175, 1, 2, 5, 'PROVINCIA', NULL, 'WAFER NIK VAINILLA 27GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(176, 1, 3, 9, 'PROVINCIA', NULL, 'BOTARGA MIMASKOT', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(177, 1, 3, 9, 'PROVINCIA', NULL, 'CARPA GRANDE MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(178, 1, 3, 9, 'PROVINCIA', NULL, 'CASACAS MASCOTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(179, 1, 3, 9, 'PROVINCIA', NULL, 'COCHE MASCOTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(180, 1, 3, 9, 'PROVINCIA', NULL, 'FUNDA MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(181, 1, 3, 9, 'PROVINCIA', NULL, 'GORRO MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(182, 1, 3, 9, 'PROVINCIA', NULL, 'POLO MMK', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(183, 1, 3, 10, 'PROVINCIA', NULL, 'FRISBEE MMK NARANJA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(184, 1, 3, 10, 'PROVINCIA', NULL, 'PLATO MIMASKOT GATO (ANARANJADO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(185, 1, 3, 10, 'PROVINCIA', NULL, 'PLATO MIMASKOT PERRO (ANARANJADO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(186, 1, 3, 10, 'PROVINCIA', NULL, 'PLATO NUTRICAN GATO (ROJO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(187, 1, 3, 10, 'PROVINCIA', NULL, 'PLATO NUTRICAN PERRO (ROJO)', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(188, 1, 3, 10, 'PROVINCIA', NULL, 'PLATO ZEUS PERRO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(189, 1, 8, 18, 'PROVINCIA', NULL, 'BANDEJA TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(190, 1, 8, 18, 'PROVINCIA', NULL, 'CARTEL ENMICADO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(191, 1, 8, 18, 'PROVINCIA', NULL, 'CHALECO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(192, 1, 8, 18, 'PROVINCIA', NULL, 'COCHE TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(193, 1, 8, 18, 'PROVINCIA', NULL, 'GORRO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(194, 1, 8, 18, 'PROVINCIA', NULL, 'MANDIL TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(195, 1, 8, 18, 'PROVINCIA', NULL, 'POLO CUELLO CAMISERO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(196, 1, 8, 18, 'PROVINCIA', NULL, 'POLO CUELLO REDONDO TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(197, 1, 8, 19, 'PROVINCIA', NULL, 'BATEA TODINNO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(198, 1, 5, 15, 'LIMA', NULL, 'BALDE CON CAÑO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(199, 1, 5, 15, 'LIMA', NULL, 'BALON DE GAS 10 KG VACIO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(200, 1, 5, 15, 'LIMA', NULL, 'BANDEJA PLASTICA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(201, 1, 5, 15, 'LIMA', NULL, 'COCINA INDUSTRIAL DE 2 HORNILLAS', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(202, 1, 5, 15, 'LIMA', NULL, 'COLADOR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(203, 1, 5, 15, 'LIMA', NULL, 'CUCHARA METALICA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(204, 1, 5, 15, 'LIMA', NULL, 'CUCHARON BASICO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(205, 1, 5, 15, 'LIMA', NULL, 'GORRO BLANCO COCINA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(206, 1, 5, 15, 'LIMA', NULL, 'MANDIL ROJO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(207, 1, 5, 15, 'LIMA', NULL, 'OLLA DE ACERO GRANDE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(208, 1, 5, 15, 'LIMA', NULL, 'OLLA GRANDE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(209, 1, 5, 15, 'LIMA', NULL, 'OLLA MEDIANA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(210, 1, 5, 15, 'LIMA', NULL, 'POLO BLANCO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(211, 1, 5, 15, 'LIMA', NULL, 'RULETA MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(212, 1, 9, NULL, 'LIMA', NULL, 'BALANZA DE MANO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(213, 1, 9, NULL, 'LIMA', NULL, 'BALDE 4LT PINTURA TANSA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(214, 1, 9, NULL, 'LIMA', NULL, 'BASES NEGRAS METALICAS', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(215, 1, 9, NULL, 'LIMA', NULL, 'BOLSAS 12 X18', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(216, 1, 9, NULL, 'LIMA', NULL, 'BOWL METALICO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(217, 1, 9, NULL, 'LIMA', NULL, 'COCHE SIN CATEGORIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(218, 1, 9, NULL, 'LIMA', NULL, 'LICUADORA OSTER', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(219, 1, 9, NULL, 'LIMA', NULL, 'MEGAFONO', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(220, 1, 9, NULL, 'LIMA', NULL, 'MOTA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(221, 1, 9, NULL, 'LIMA', NULL, 'SOMBRILLA MOLITALIA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(222, 1, 9, NULL, 'LIMA', NULL, 'TAPPER RECTANGULAR', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(223, 1, 9, NULL, 'LIMA', NULL, 'USB', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(224, 1, 7, 17, 'LIMA', NULL, 'BANDEJA DEGUSTACION FRUGELE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(225, 1, 7, 17, 'LIMA', NULL, 'GORRO ROJO FRUGELE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(226, 1, 7, 17, 'LIMA', NULL, 'POLO ROJO FRUGELE', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(227, 1, 7, 18, 'LIMA', NULL, 'FRUGELE MIX TROPICAL', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(228, 1, 7, 18, 'LIMA', NULL, 'FRUGELE TRIFUNA CHICAHA', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(229, 1, 6, 16, 'LIMA', NULL, 'MATERIAL DEGUSTACION FANNY', NULL, 0, 0, 1, '2026-04-15 14:02:40', '2026-04-15 14:02:40'),
+(230, 1, 6, 17, 'LIMA', NULL, 'ATUN EN TROZOS FANNY 140 GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(231, 1, 6, 17, 'LIMA', NULL, 'GALLETA SODA 40GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55'),
+(232, 1, 6, 17, 'LIMA', NULL, 'GALLETA SODA AGUA LINE 40GR', NULL, 1, 1, 1, '2026-04-15 14:02:40', '2026-04-15 14:40:55');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `tipos_mercaderia`
+--
+
+CREATE TABLE `tipos_mercaderia` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `categoria_id` int(10) UNSIGNED NOT NULL,
+  `nombre` varchar(100) NOT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `tipos_mercaderia`
+--
+
+INSERT INTO `tipos_mercaderia` (`id`, `categoria_id`, `nombre`, `activo`, `created_at`) VALUES
+(1, 1, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(2, 1, 'CANJES', 1, '2026-04-15 14:02:40'),
+(3, 1, 'MERCARISMO', 1, '2026-04-15 14:02:40'),
+(4, 2, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(5, 2, 'CANJES', 1, '2026-04-15 14:02:40'),
+(6, 2, 'MERCARISMO', 1, '2026-04-15 14:02:40'),
+(7, 2, 'CRUCERISMO', 1, '2026-04-15 14:02:40'),
+(8, 2, 'MERCADERISMO', 1, '2026-04-15 14:02:40'),
+(9, 3, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(10, 3, 'CANJES', 1, '2026-04-15 14:02:40'),
+(11, 3, 'MERCARISMO', 1, '2026-04-15 14:02:40'),
+(12, 4, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(13, 4, 'CANJES', 1, '2026-04-15 14:02:40'),
+(14, 5, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(15, 6, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(16, 6, 'DEGUSTACION', 1, '2026-04-15 14:02:40'),
+(17, 7, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(18, 7, 'CANJES', 1, '2026-04-15 14:02:40'),
+(19, 8, 'ACTIVOS', 1, '2026-04-15 14:02:40'),
+(20, 8, 'CANJES', 1, '2026-04-15 14:02:40'),
+(21, 9, 'ACTIVOS', 1, '2026-04-15 14:02:40');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `usuarios`
+--
+
+CREATE TABLE `usuarios` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `empresa_id` int(10) UNSIGNED DEFAULT NULL,
+  `nombre` varchar(100) NOT NULL,
+  `apellido` varchar(100) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `rol` enum('superadmin','admin','supervisor','almacenero') NOT NULL DEFAULT 'almacenero',
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `ultimo_login` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `usuarios`
+--
+
+INSERT INTO `usuarios` (`id`, `empresa_id`, `nombre`, `apellido`, `email`, `password_hash`, `rol`, `activo`, `ultimo_login`, `created_at`, `updated_at`) VALUES
+(1, NULL, 'Super', 'Admin', 'superadmin@zentra.com', '$2a$10$fEemZ9gfJk1Hz1UbDL/kpupcQAO4WeZsj/Cmxvvshd890946aITfC', 'superadmin', 1, '2026-04-20 10:00:00', '2026-04-15 14:02:40', '2026-04-20 15:00:00'),
+(2, 1, 'ADMIN', 'ZENTRA', 'adminzentra@nexa.pe', '$2a$10$ndafAjKpocRD3caWv0oijuf46iIRDyhAPK8Kt3HnHkp5mK6BM/vxS', 'admin', 1, '2026-04-16 15:24:09', '2026-04-15 14:04:17', '2026-04-16 20:24:09'),
+(3, 1, 'SUPERVISOR', 'ZENTRA', 'supervisor@nexa.pe', '$2a$10$ouRAtqEjr0I/cIbp77btgORLSyJXRrEKOwTG0SVW.iZ67i9HlzXzG', 'supervisor', 1, '2026-04-20 10:04:39', '2026-04-15 15:04:02', '2026-04-20 15:04:39'),
+(4, 1, 'ALMACENERO', 'ZENTRA', 'almacenero@nexa.pe', '$2a$10$QIGpdKhGJb0BH/aqE1uj5eMl79hkuUSCeHjk7coNFkkPGGazcMRW.', 'almacenero', 1, '2026-04-16 12:47:38', '2026-04-15 15:04:31', '2026-04-16 17:47:38'),
+(5, 1, 'Juan Fernando', 'Ysen paiba', 'juanfernando.ysenpaiba@gdb.com.pe', '$2a$10$0zIP5bDNV0xwxEGcZurMSu6zwAUPcDdF9m3XVmsVcGLzjXXJ41MZ.', 'almacenero', 1, '2026-04-16 15:50:25', '2026-04-16 17:55:06', '2026-04-16 20:50:25');
+
+-- --------------------------------------------------------
+
+--
+-- Estructura de tabla para la tabla `usuario_almacen`
+--
+
+CREATE TABLE `usuario_almacen` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `usuario_id` int(10) UNSIGNED NOT NULL,
+  `almacen_id` int(10) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+--
+-- Volcado de datos para la tabla `usuario_almacen`
+--
+
+INSERT INTO `usuario_almacen` (`id`, `usuario_id`, `almacen_id`, `created_at`) VALUES
+(1, 3, 28, '2026-04-15 15:04:02'),
+(2, 3, 24, '2026-04-15 15:04:02'),
+(3, 3, 27, '2026-04-15 15:04:02'),
+(4, 3, 26, '2026-04-15 15:04:02'),
+(5, 3, 25, '2026-04-15 15:04:02'),
+(6, 3, 7, '2026-04-15 15:04:02'),
+(7, 3, 3, '2026-04-15 15:04:02'),
+(8, 3, 6, '2026-04-15 15:04:02'),
+(9, 3, 10, '2026-04-15 15:04:02'),
+(10, 3, 5, '2026-04-15 15:04:02'),
+(32, 4, 28, '2026-04-15 15:17:31'),
+(33, 4, 24, '2026-04-15 15:17:31'),
+(34, 4, 27, '2026-04-15 15:17:31'),
+(35, 4, 26, '2026-04-15 15:17:31'),
+(36, 4, 25, '2026-04-15 15:17:31'),
+(37, 4, 7, '2026-04-15 15:17:31'),
+(38, 4, 3, '2026-04-15 15:17:31'),
+(39, 4, 6, '2026-04-15 15:17:31'),
+(40, 4, 10, '2026-04-15 15:17:31'),
+(41, 4, 5, '2026-04-15 15:17:31'),
+(42, 4, 18, '2026-04-15 15:17:31'),
+(44, 5, 28, '2026-04-16 21:03:52');
+
+--
+-- Índices para tablas volcadas
+--
+
+--
+-- Indices de la tabla `almacenes`
+--
+ALTER TABLE `almacenes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_ciudad` (`ciudad_id`);
+
+--
+-- Indices de la tabla `audit_log`
+--
+ALTER TABLE `audit_log`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`),
+  ADD KEY `idx_usuario` (`usuario_id`);
+
+--
+-- Indices de la tabla `categorias`
+--
+ALTER TABLE `categorias`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`);
+
+--
+-- Indices de la tabla `ciudades`
+--
+ALTER TABLE `ciudades`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_region` (`region_id`);
+
+--
+-- Indices de la tabla `empresas`
+--
+ALTER TABLE `empresas`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_ruc` (`ruc`);
+
+--
+-- Indices de la tabla `indicadores`
+--
+ALTER TABLE `indicadores`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`);
+
+--
+-- Indices de la tabla `lotes`
+--
+ALTER TABLE `lotes`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_sku` (`sku_id`);
+
+--
+-- Indices de la tabla `personal_receptor`
+--
+ALTER TABLE `personal_receptor`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`),
+  ADD KEY `idx_pr_almacen` (`almacen_id`),
+  ADD KEY `idx_pr_categoria` (`categoria_id`);
+
+--
+-- Indices de la tabla `regiones`
+--
+ALTER TABLE `regiones`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`);
+
+--
+-- Indices de la tabla `registros`
+--
+ALTER TABLE `registros`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`),
+  ADD KEY `idx_almacen_origen` (`almacen_origen_id`),
+  ADD KEY `idx_usuario` (`usuario_id`),
+  ADD KEY `idx_fecha` (`fecha`),
+  ADD KEY `idx_estado` (`estado`),
+  ADD KEY `idx_sku` (`sku_id`),
+  ADD KEY `idx_categoria` (`categoria_id`);
+
+--
+-- Indices de la tabla `skus`
+--
+ALTER TABLE `skus`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_empresa` (`empresa_id`),
+  ADD KEY `idx_categoria` (`categoria_id`),
+  ADD KEY `idx_tipo` (`tipo_mercaderia_id`);
+
+--
+-- Indices de la tabla `tipos_mercaderia`
+--
+ALTER TABLE `tipos_mercaderia`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_categoria` (`categoria_id`);
+
+--
+-- Indices de la tabla `usuarios`
+--
+ALTER TABLE `usuarios`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_email` (`email`),
+  ADD KEY `idx_empresa` (`empresa_id`),
+  ADD KEY `idx_rol` (`rol`);
+
+--
+-- Indices de la tabla `usuario_almacen`
+--
+ALTER TABLE `usuario_almacen`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_ua` (`usuario_id`,`almacen_id`),
+  ADD KEY `idx_usuario` (`usuario_id`),
+  ADD KEY `idx_almacen` (`almacen_id`);
+
+--
+-- AUTO_INCREMENT de las tablas volcadas
+--
+
+--
+-- AUTO_INCREMENT de la tabla `almacenes`
+--
+ALTER TABLE `almacenes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=29;
+
+--
+-- AUTO_INCREMENT de la tabla `audit_log`
+--
+ALTER TABLE `audit_log`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `categorias`
+--
+ALTER TABLE `categorias`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+
+--
+-- AUTO_INCREMENT de la tabla `ciudades`
+--
+ALTER TABLE `ciudades`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
+-- AUTO_INCREMENT de la tabla `empresas`
+--
+ALTER TABLE `empresas`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT de la tabla `indicadores`
+--
+ALTER TABLE `indicadores`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+
+--
+-- AUTO_INCREMENT de la tabla `lotes`
+--
+ALTER TABLE `lotes`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT de la tabla `personal_receptor`
+--
+ALTER TABLE `personal_receptor`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `regiones`
+--
+ALTER TABLE `regiones`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `registros`
+--
+ALTER TABLE `registros`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT de la tabla `skus`
+--
+ALTER TABLE `skus`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=233;
+
+--
+-- AUTO_INCREMENT de la tabla `tipos_mercaderia`
+--
+ALTER TABLE `tipos_mercaderia`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+
+--
+-- AUTO_INCREMENT de la tabla `usuarios`
+--
+ALTER TABLE `usuarios`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT de la tabla `usuario_almacen`
+--
+ALTER TABLE `usuario_almacen`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
