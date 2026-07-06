@@ -176,6 +176,20 @@ export default function TGInternoDetallePage() {
             </p>
           </div>
 
+          {transferencia.foto_guia && (
+            <div>
+              <p className="text-sm font-medium text-gray-600">Sustento guía</p>
+              <a
+                href={`/uploads/${transferencia.foto_guia}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary btn-sm mt-1 inline-flex"
+              >
+                Ver archivo
+              </a>
+            </div>
+          )}
+
           {transferencia.observaciones && (
             <div className="md:col-span-2">
               <p className="text-sm font-medium text-gray-600">Observaciones</p>

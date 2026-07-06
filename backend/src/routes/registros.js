@@ -198,6 +198,10 @@ function isSalidaRegistro(registro = {}) {
   return String(registro.tipo_accion || "").trim().toUpperCase() === "SALIDA";
 }
 
+function isEntradaRegistro(registro = {}) {
+  return String(registro.tipo_accion || "").trim().toUpperCase() === "ENTRADA";
+}
+
 function hasSameOriginDestination(registro = {}) {
   const originId = parsePositiveInt(registro.almacen_origen_id);
   const destinationId = parsePositiveInt(registro.almacen_destino_id);
@@ -612,12 +616,14 @@ async function buildRegistroQuery(req, executor = pool) {
     categoria_id,
     tipo_accion,
     estado,
+    q_id,
     q_almacen_origen,
     q_almacen_destino,
     q_categoria,
     q_tipo_accion,
     q_sku,
     q_estado,
+    q_zona,
     q_registrado_por,
     q_nro_guia,
     sort_by = "fecha",
@@ -664,6 +670,20 @@ async function buildRegistroQuery(req, executor = pool) {
   if (estado) {
     where += " AND r.estado = ?";
     params.push(estado);
+  }
+  if (q_id) {
+    const idTerm = Number.parseInt(q_id, 10);
+    if (Number.isInteger(idTerm) && idTerm > 0) {
+      where += " AND r.id = ?";
+      params.push(idTerm);
+    }
+  }
+  if (q_zona) {
+    const zona = String(q_zona).trim().toUpperCase();
+    if (ZONAS.includes(zona)) {
+      where += ` AND ${getZonaExpr("ci")}=?`;
+      params.push(zona);
+    }
   }
 
   where = addLikeFilter(where, params, q_almacen_origen, "ao.nombre");
@@ -1312,6 +1332,119 @@ function buildPreviousOriginRequirements(movements = []) {
   return requiredByKey;
 }
 
+function addStockDelta(deltaMap, keyParts, amount) {
+  const normalizedAmount = Number(amount || 0);
+  if (!normalizedAmount) return;
+
+  const loteKey = parsePositiveInt(keyParts.lote_id) || "sin-lote";
+  const key = [
+    keyParts.empresa_id,
+    keyParts.almacen_id,
+    keyParts.sku_id,
+    loteKey,
+  ].join("|");
+  const current = deltaMap.get(key) || {
+    empresa_id: keyParts.empresa_id,
+    almacen_id: keyParts.almacen_id,
+    sku_id: keyParts.sku_id,
+    lote_id: parsePositiveInt(keyParts.lote_id) || null,
+    cantidad: 0,
+  };
+
+  current.cantidad += normalizedAmount;
+  deltaMap.set(key, current);
+}
+
+function addMovementContributionDelta(deltaMap, movement, multiplier = 1) {
+  const cantidad = Number(movement.cantidad || 0);
+  if (!cantidad) return;
+
+  const effects = getMovementEffects(movement.tipo_movimiento);
+  if (effects.originDelta && movement.almacen_origen_id) {
+    addStockDelta(
+      deltaMap,
+      {
+        empresa_id: movement.empresa_id,
+        almacen_id: movement.almacen_origen_id,
+        sku_id: movement.sku_id,
+        lote_id: movement.lote_id,
+      },
+      cantidad * effects.originDelta * multiplier,
+    );
+  }
+
+  if (effects.destinationDelta && movement.almacen_destino_id) {
+    addStockDelta(
+      deltaMap,
+      {
+        empresa_id: movement.empresa_id,
+        almacen_id: movement.almacen_destino_id,
+        sku_id: movement.sku_id,
+        lote_id: movement.lote_id,
+      },
+      cantidad * effects.destinationDelta * multiplier,
+    );
+  }
+}
+
+async function applyApprovedEntryStockDelta(
+  executor,
+  previousMovements,
+  registro,
+  usuarioId,
+) {
+  const deltaMap = new Map();
+
+  previousMovements.forEach((movement) => {
+    addMovementContributionDelta(deltaMap, movement, -1);
+  });
+
+  if (shouldApplyApprovedDestinationStock(registro)) {
+    const detalles = Array.isArray(registro.detalles) ? registro.detalles : [];
+    detalles.forEach((detail) => {
+      addStockDelta(
+        deltaMap,
+        {
+          empresa_id: registro.empresa_id,
+          almacen_id: registro.almacen_destino_id,
+          sku_id: detail.sku_id,
+          lote_id: detail.lote_id,
+        },
+        Number(detail.cantidad || 0),
+      );
+    });
+  }
+
+  for (const delta of deltaMap.values()) {
+    if (Math.abs(delta.cantidad) < STOCK_EPSILON) continue;
+    await upsertStock(executor, delta);
+  }
+
+  await executor.query("DELETE FROM stock_movimientos WHERE registro_id=?", [
+    registro.id,
+  ]);
+
+  if (shouldApplyApprovedDestinationStock(registro)) {
+    const detalles = Array.isArray(registro.detalles) ? registro.detalles : [];
+    for (const detail of detalles) {
+      const cantidad = Number(detail.cantidad || 0);
+      if (!cantidad) continue;
+      await insertStockMovement(executor, {
+        empresa_id: registro.empresa_id,
+        registro_id: registro.id,
+        registro_detalle_id: detail.id || null,
+        almacen_origen_id: registro.almacen_origen_id,
+        almacen_destino_id: registro.almacen_destino_id,
+        sku_id: detail.sku_id,
+        lote_id: detail.lote_id,
+        cantidad,
+        tipo_movimiento: "INGRESO_APROBADO",
+        usuario_id: usuarioId || registro.usuario_id,
+      });
+    }
+  }
+}
+
 function buildPreviousOriginRequirementsFromDetails(registro = {}) {
   const requiredByKey = new Map();
   const almacenOrigenId = parsePositiveInt(registro.almacen_origen_id);
@@ -1456,7 +1589,7 @@ async function applyApprovalStock(executor, registro, options = {}) {
     registro.indicador_nombre || registro.indicador || "",
   );
 
-  if (!isMolitaliaEntry) {
+  if (!isMolitaliaEntry && !isEntradaRegistro(registro)) {
     await applyStockMovementBatch(
       executor,
       registro,
@@ -1921,7 +2054,11 @@ async function validateRegistroPayloadV2(
     });
   });
 
-  if (!isMolitaliaEntry && !skipStockAvailability) {
+  if (
+    !isMolitaliaEntry &&
+    !isEntradaRegistro(payload) &&
+    !skipStockAvailability
+  ) {
     await ensureStockAvailabilityForBatch(
       executor,
       {
@@ -3619,9 +3756,10 @@ function buildStockReportRows(
     .sort(
       (a, b) =>
         String(a.almacen).localeCompare(String(b.almacen)) ||
-        String(a.categoria).localeCompare(String(b.categoria)) ||
         String(a.sku).localeCompare(String(b.sku)) ||
-        String(a.lote).localeCompare(String(b.lote)),
+        String(a.lote).localeCompare(String(b.lote)) ||
+        String(a.categoria).localeCompare(String(b.categoria)) ||
+        String(a.tipo_mercaderia).localeCompare(String(b.tipo_mercaderia)),
     );
 
   return { rows, movementLabels };
@@ -4596,10 +4734,13 @@ router.put(
 
       let approvedMovementsBefore = [];
       let previousOriginRequirements = new Map();
+      const useApprovedEntryDelta = isApprovedEdit && isEntradaRegistro(existing);
       if (isApprovedEdit) {
         approvedMovementsBefore = await getRegistroStockMovements(connection, id);
         previousOriginRequirements = buildPreviousOriginRequirements(approvedMovementsBefore);
-        await reverseRecordedStockMovements(connection, id);
+        if (!useApprovedEntryDelta) {
+          await reverseRecordedStockMovements(connection, id);
+        }
       } else {
         previousOriginRequirements = await buildPendingEditOriginRequirements(
           connection,
@@ -4667,9 +4808,18 @@ router.put(
       let approvedMovementsAfter = [];
 
       if (isApprovedEdit) {
-        await applyApprovalStock(connection, updatedRegistro, {
-          previousRequiredByKey: previousOriginRequirements,
-        });
+        if (useApprovedEntryDelta) {
+          await applyApprovedEntryStockDelta(
+            connection,
+            approvedMovementsBefore,
+            updatedRegistro,
+            req.usuario.id,
+          );
+        } else {
+          await applyApprovalStock(connection, updatedRegistro, {
+            previousRequiredByKey: previousOriginRequirements,
+          });
+        }
         approvedMovementsAfter = await getRegistroStockMovements(connection, id);
         updatedRegistro = await getRegistroById(connection, req, id);
 
@@ -4848,7 +4998,7 @@ router.patch(
 
         // Para registros TG MOLITALIA no aplicamos SALIDA_TRANSITO (solo ingreso)
         if (existing.estado === "pendiente" && estado === "en_transito") {
-          if (!isMolitaliaEntry) {
+          if (!isMolitaliaEntry && !isEntradaRegistro(existing)) {
             await applyStockMovementBatch(
               connection,
               existing,
@@ -4857,8 +5007,8 @@ router.patch(
             );
           }
         } else if (existing.estado === "pendiente" && estado === "aprobado") {
-          if (isMolitaliaEntry) {
-            // Solo registrar el ingreso aprobado para TG MOLITALIA
+          if (isMolitaliaEntry || isEntradaRegistro(existing)) {
+            // Entradas y TG MOLITALIA solo registran ingreso aprobado.
             if (shouldApplyApprovedDestinationStock(existing)) {
               await applyStockMovementBatch(
                 connection,

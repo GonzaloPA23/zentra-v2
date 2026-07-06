@@ -34,6 +34,7 @@ const EMPTY_TABLE_FILTERS = {
   q_tipo_accion: '',
   q_sku: '',
   q_nro_guia: '',
+  q_zona: '',
   q_registrado_por: '',
   sort_by: 'fecha',
   sort_dir: 'desc',
@@ -50,7 +51,7 @@ function nextSortState(current, key) {
 function DetalleExpandido({ row }) {
   return (
     <tr className="bg-blue-50/40">
-      <td colSpan={11} className="px-4 py-4">
+      <td colSpan={12} className="px-4 py-4">
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3 xl:grid-cols-6">
             <div>
@@ -347,6 +348,7 @@ function RegistroRow({ row, expanded, onToggle, canManageStates, onAprobar, onRe
   return (
     <>
       <tr className="cursor-pointer" onClick={() => onToggle(row.id)}>
+        <td><span className="badge-gray badge">{row.zona || '-'}</span></td>
         <td className="font-semibold text-gray-900">{row.id}</td>
         <td className="whitespace-nowrap font-medium">{formatSafeDate(row.fecha)}</td>
         <td className="max-w-[180px] truncate" title={row.almacen_origen || ''}>{row.almacen_origen || '-'}</td>
@@ -454,6 +456,17 @@ function TablaModulo({
         <table className="table">
           <thead>
             <tr>
+              <SortableFilterHeader
+                label="Zona"
+                sortConfig={sortConfig}
+                filterValue={filters.q_zona}
+                onFilterChange={(value) => onFilterChange('q_zona', value)}
+                placeholder="Todas"
+                options={[
+                  { value: 'LIMA', label: 'LIMA' },
+                  { value: 'PROVINCIA', label: 'PROVINCIA' },
+                ]}
+              />
               <SortableFilterHeader label="ID" filterType="none" />
               <SortableFilterHeader
                 label="Fecha"
@@ -531,7 +544,7 @@ function TablaModulo({
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={11} className="py-10 text-center text-gray-400">
+                <td colSpan={12} className="py-10 text-center text-gray-400">
                   <div className="flex items-center justify-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-400 border-t-transparent" />
                     Cargando...
@@ -540,7 +553,7 @@ function TablaModulo({
               </tr>
             ) : registros.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-10 text-center text-gray-400">
+                <td colSpan={12} className="py-10 text-center text-gray-400">
                   No hay registros en esta sección.
                 </td>
               </tr>

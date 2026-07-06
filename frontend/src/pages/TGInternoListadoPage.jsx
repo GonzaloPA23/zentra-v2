@@ -57,6 +57,21 @@ export default function TGInternoListadoPage() {
     },
     { header: "Cantidad", accessor: "cantidad_origen" },
     {
+      header: "Sustento",
+      value: (row) => row.foto_guia || "",
+      render: (row) => row.foto_guia ? (
+        <a
+          href={`/uploads/${row.foto_guia}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs font-medium text-blue-600 hover:text-blue-800"
+          onClick={(event) => event.stopPropagation()}
+        >
+          Ver archivo
+        </a>
+      ) : "-",
+    },
+    {
       header: "Destinos",
       value: (row) => `${Number(row.detalles_count || 0)} categorias`,
       render: (row) => (

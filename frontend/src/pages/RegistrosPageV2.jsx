@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -45,12 +45,14 @@ const LABELS = {
 const EMPTY_FILTERS = {
   fecha_ini: "",
   fecha_fin: "",
+  q_id: "",
   q_almacen_origen: "",
   q_almacen_destino: "",
   q_categoria: "",
   q_tipo_accion: "",
   q_sku: "",
   q_estado: "",
+  q_zona: "",
   q_registrado_por: "",
   q_nro_guia: "",
   sort_by: "fecha",
@@ -548,7 +550,7 @@ function StockInicialModal({ open, onClose, onSaved }) {
 function DetalleExpandido({ row }) {
   return (
     <tr className="bg-blue-50/40">
-      <td colSpan={11} className="px-4 py-4">
+      <td colSpan={12} className="px-4 py-4">
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3 xl:grid-cols-6">
             <div>
@@ -677,7 +679,10 @@ function RegistroRow({
 
   return (
     <>
-      <tr className="cursor-pointer" onClick={() => onToggle(row.id)}>
+      <tr>
+        <td>
+          <span className="badge-gray badge">{row.zona || "-"}</span>
+        </td>
         <td className="font-semibold text-gray-900">{row.id}</td>
         <td className="whitespace-nowrap">{formatSafeDate(row.fecha)}</td>
         <td className="max-w-[180px] truncate" title={row.almacen_origen || ""}>
@@ -763,6 +768,8 @@ export default function RegistrosPageV2() {
   const [deleting, setDeleting] = useState(null);
   const [stockInicialOpen, setStockInicialOpen] = useState(false);
   const [stockInicialBulkOpen, setStockInicialBulkOpen] = useState(false);
+  const tableScrollRef = useRef(null);
+  const tableDragRef = useRef(null);
 
   const canCreate = hasRole("superadmin", "admin", "almacenero");
   const canEdit = hasRole("superadmin", "admin");
@@ -834,6 +841,31 @@ export default function RegistrosPageV2() {
       downloadBlobResponse(response, `zentra_registro_${registroId}.xlsx`);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));
+    }
+  };
+
+  const startTableDrag = (event) => {
+    if (event.button !== 0 || !tableScrollRef.current) return;
+    if (event.target.closest("input, select, button, a, textarea")) return;
+    event.preventDefault();
+    tableDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      scrollLeft: tableScrollRef.current.scrollLeft,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const moveTableDrag = (event) => {
+    const drag = tableDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !tableScrollRef.current) return;
+    event.preventDefault();
+    tableScrollRef.current.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX);
+  };
+
+  const stopTableDrag = (event) => {
+    if (tableDragRef.current?.pointerId === event.pointerId) {
+      tableDragRef.current = null;
     }
   };
 
@@ -965,10 +997,45 @@ export default function RegistrosPageV2() {
       </div>
 
       <div className="table-container">
-        <table className="table">
-          <thead>
+        <div
+          className="hidden"
+          title="Mantén presionado y arrastra para mover la tabla"
+          onPointerDown={startTableDrag}
+          onPointerMove={moveTableDrag}
+          onPointerUp={stopTableDrag}
+          onPointerCancel={stopTableDrag}
+        >
+          <span aria-hidden="true" />
+          Mantén presionado aquí y arrastra para mover la tabla
+        </div>
+        <div ref={tableScrollRef} className="overflow-x-auto">
+        <table className="table min-w-[2400px]">
+          <thead
+            className="cursor-grab active:cursor-grabbing"
+            title="Arrastra desde el encabezado para mover la tabla"
+            onPointerDown={startTableDrag}
+            onPointerMove={moveTableDrag}
+            onPointerUp={stopTableDrag}
+            onPointerCancel={stopTableDrag}
+          >
             <tr>
-              <SortableFilterHeader label="ID" filterType="none" />
+              <SortableFilterHeader
+                label="Zona"
+                sortConfig={sortConfig}
+                filterValue={filters.q_zona}
+                onFilterChange={(value) => updateFilter("q_zona", value)}
+                placeholder="Todas"
+                options={[
+                  { value: "LIMA", label: "LIMA" },
+                  { value: "PROVINCIA", label: "PROVINCIA" },
+                ]}
+              />
+              <SortableFilterHeader
+                label="ID"
+                filterValue={filters.q_id}
+                onFilterChange={(value) => updateFilter("q_id", value)}
+                placeholder="ID..."
+              />
               <SortableFilterHeader
                 label="Fecha"
                 sortKey="fecha"
@@ -1058,7 +1125,7 @@ export default function RegistrosPageV2() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-gray-400">
+                <td colSpan={12} className="py-12 text-center text-gray-400">
                   <div className="flex items-center justify-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-400 border-t-transparent" />
                     Cargando registros...
@@ -1067,7 +1134,7 @@ export default function RegistrosPageV2() {
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-gray-400">
+                <td colSpan={12} className="py-12 text-center text-gray-400">
                   No hay registros para mostrar.
                 </td>
               </tr>
@@ -1091,6 +1158,7 @@ export default function RegistrosPageV2() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {pagination.pages > 1 && (

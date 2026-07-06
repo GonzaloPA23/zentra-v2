@@ -1,4 +1,7 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 const { authMiddleware, empresaMiddleware, requireRol } = require("../middleware/auth");
 const { pool } = require("../db");
 const { sendExcelWorkbook } = require("../utils/excel");
@@ -9,6 +12,30 @@ const STOCK_EPSILON = 0.000001;
 // Aplicar middlewares globales
 router.use(authMiddleware);
 router.use(empresaMiddleware);
+
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = process.env.UPLOAD_PATH || "./uploads";
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: uploadStorage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || "", 10) || 5 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|pdf/;
+    if (allowed.test(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error("Solo se permiten JPG, PNG o PDF"));
+  },
+});
 
 function parsePositiveInt(value) {
   const parsed = Number.parseInt(value, 10);
@@ -27,6 +54,32 @@ function parsePositiveIntegerQuantity(value) {
 
 function parseBooleanFlag(value) {
   return value === true || value === 1 || value === "1";
+}
+
+function cleanupUploadedFile(fileName) {
+  if (!fileName) return;
+  const uploadDir = process.env.UPLOAD_PATH || "./uploads";
+  fs.unlink(path.resolve(uploadDir, fileName), () => {});
+}
+
+function parseJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value.trim()) return JSON.parse(value);
+  return [];
+}
+
+async function resolveEmpresaIdForWarehouse(executor, req, almacenId) {
+  if (req.empresa_id) return req.empresa_id;
+  const [rows] = await executor.query(
+    `SELECT r.empresa_id
+     FROM almacenes a
+     JOIN ciudades c ON c.id = a.ciudad_id
+     JOIN regiones r ON r.id = c.region_id
+     WHERE a.id=?
+     LIMIT 1`,
+    [almacenId],
+  );
+  return rows[0]?.empresa_id || null;
 }
 
 function normalizeSkuName(value) {
@@ -73,7 +126,7 @@ async function ensureTgInternoColumns(executor) {
      FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE()
        AND TABLE_NAME = 'tg_interno_transferencias'
-       AND COLUMN_NAME IN ('sku_origen_id','lote_origen_id')`,
+       AND COLUMN_NAME IN ('sku_origen_id','lote_origen_id','foto_guia')`,
   );
   const existing = new Set(columns.map((column) => column.COLUMN_NAME));
 
@@ -85,6 +138,11 @@ async function ensureTgInternoColumns(executor) {
   if (!existing.has("lote_origen_id")) {
     await executor.query(
       "ALTER TABLE `tg_interno_transferencias` ADD COLUMN `lote_origen_id` int(10) UNSIGNED DEFAULT NULL AFTER `sku_origen_id`",
+    );
+  }
+  if (!existing.has("foto_guia")) {
+    await executor.query(
+      "ALTER TABLE `tg_interno_transferencias` ADD COLUMN `foto_guia` varchar(255) DEFAULT NULL AFTER `observaciones`",
     );
   }
 
@@ -132,30 +190,7 @@ async function getCurrentStockAmount(
   );
   const stockAmount = Number(rows[0]?.cantidad || 0);
 
-  const [duplicatedIngressRows] = await executor.query(
-    normalizedLoteId
-      ? `SELECT COALESCE(SUM(sm.cantidad), 0) AS cantidad
-         FROM stock_movimientos sm
-         JOIN registros r ON r.id = sm.registro_id
-         WHERE sm.empresa_id=? AND sm.almacen_destino_id=? AND sm.sku_id=? AND sm.lote_id=?
-           AND sm.tipo_movimiento='INGRESO_APROBADO'
-           AND r.tipo_accion='SALIDA'
-           AND sm.almacen_origen_id=sm.almacen_destino_id
-           AND r.eliminado_at IS NULL`
-      : `SELECT COALESCE(SUM(sm.cantidad), 0) AS cantidad
-         FROM stock_movimientos sm
-         JOIN registros r ON r.id = sm.registro_id
-         WHERE sm.empresa_id=? AND sm.almacen_destino_id=? AND sm.sku_id=? AND sm.lote_id IS NULL
-           AND sm.tipo_movimiento='INGRESO_APROBADO'
-           AND r.tipo_accion='SALIDA'
-           AND sm.almacen_origen_id=sm.almacen_destino_id
-           AND r.eliminado_at IS NULL`,
-    normalizedLoteId
-      ? [empresa_id, almacen_id, sku_id, normalizedLoteId]
-      : [empresa_id, almacen_id, sku_id],
-  );
-
-  return stockAmount - Number(duplicatedIngressRows[0]?.cantidad || 0);
+  return stockAmount;
 }
 
 async function upsertStock(
@@ -292,8 +327,12 @@ router.get("/stock", async (req, res) => {
       return res.status(400).json({ mensaje: "almacen_id requerido" });
     }
 
-    const params = [req.empresa_id, almacenId];
-    let where = "sa.empresa_id=? AND sa.almacen_id=? AND sa.cantidad > 0";
+    const params = [almacenId];
+    let where = "sa.almacen_id=? AND sa.cantidad > 0";
+    if (req.empresa_id) {
+      where += " AND sa.empresa_id=?";
+      params.push(req.empresa_id);
+    }
     if (categoriaId) {
       where += " AND sk.categoria_id=?";
       params.push(categoriaId);
@@ -304,7 +343,7 @@ router.get("/stock", async (req, res) => {
         sa.almacen_id,
         sa.sku_id,
         sa.lote_id,
-        GREATEST(sa.cantidad - COALESCE(dup.cantidad, 0), 0) AS stock_disponible,
+        sa.cantidad AS stock_disponible,
         sk.codigo AS sku_codigo,
         sk.nombre AS sku_nombre,
         sk.categoria_id,
@@ -315,24 +354,6 @@ router.get("/stock", async (req, res) => {
        JOIN skus sk ON sk.id = sa.sku_id
        JOIN categorias ca ON ca.id = sk.categoria_id
        LEFT JOIN lotes lo ON lo.id = sa.lote_id
-       LEFT JOIN (
-         SELECT
-           sm.empresa_id,
-           sm.almacen_destino_id AS almacen_id,
-           sm.sku_id,
-           sm.lote_id,
-           SUM(sm.cantidad) AS cantidad
-         FROM stock_movimientos sm
-         JOIN registros r ON r.id = sm.registro_id
-         WHERE sm.tipo_movimiento='INGRESO_APROBADO'
-           AND r.tipo_accion='SALIDA'
-           AND sm.almacen_origen_id=sm.almacen_destino_id
-           AND r.eliminado_at IS NULL
-         GROUP BY sm.empresa_id, sm.almacen_destino_id, sm.sku_id, sm.lote_id
-       ) dup ON dup.empresa_id = sa.empresa_id
-         AND dup.almacen_id = sa.almacen_id
-         AND dup.sku_id = sa.sku_id
-         AND (dup.lote_id <=> sa.lote_id)
        WHERE ${where}
        HAVING stock_disponible > 0
        ORDER BY ca.nombre, sk.nombre, lo.fecha_vencimiento IS NULL, lo.fecha_vencimiento, lo.codigo_lote`,
@@ -361,6 +382,7 @@ router.get("/", async (req, res) => {
         t.cantidad_origen,
         t.usuario_id,
         t.observaciones,
+        t.foto_guia,
         t.activo,
         t.created_at,
         u.nombre as usuario_nombre,
@@ -373,10 +395,10 @@ router.get("/", async (req, res) => {
       LEFT JOIN skus sk ON sk.id = t.sku_origen_id
       LEFT JOIN lotes lo ON lo.id = t.lote_origen_id
       LEFT JOIN tg_interno_detalle d ON t.id = d.tg_interno_transferencia_id
-      WHERE t.empresa_id = ?
+      WHERE (? IS NULL OR t.empresa_id = ?)
       GROUP BY t.id
       ORDER BY t.created_at DESC`,
-      [req.empresa_id]
+      [req.empresa_id || null, req.empresa_id || null]
     );
 
     res.json({ datos: transferencias });
@@ -401,6 +423,7 @@ router.get(["/export", "/export/xlsx"], async (req, res) => {
         lo.fecha_vencimiento as fecha_vencimiento_origen,
         t.cantidad_origen,
         t.observaciones,
+        t.foto_guia,
         CONCAT_WS(' ', u.nombre, u.apellido) as usuario,
         t.created_at,
         t.activo,
@@ -421,9 +444,9 @@ router.get(["/export", "/export/xlsx"], async (req, res) => {
       LEFT JOIN categorias c2 ON c2.id = d.categoria_destino_id
       LEFT JOIN skus skd ON skd.id = d.sku_destino_id
       LEFT JOIN lotes lod ON lod.id = d.lote_destino_id
-      WHERE t.empresa_id = ? AND t.activo = 1
+      WHERE (? IS NULL OR t.empresa_id = ?) AND t.activo = 1
       ORDER BY t.created_at DESC, t.id DESC, d.id ASC`,
-      [req.empresa_id]
+      [req.empresa_id || null, req.empresa_id || null]
     );
 
     return await sendExcelWorkbook(res, {
@@ -448,6 +471,7 @@ router.get(["/export", "/export/xlsx"], async (req, res) => {
         { header: "ESTADO", key: "estado", width: 12 },
         { header: "USUARIO", key: "usuario", width: 24 },
         { header: "OBSERVACIONES", key: "observaciones", width: 36 },
+        { header: "FOTO GUIA", key: "foto_guia", width: 34 },
       ],
       rows: transferencias.map((row) => ({
         id: Number(row.id || 0),
@@ -468,6 +492,7 @@ router.get(["/export", "/export/xlsx"], async (req, res) => {
         estado: row.activo ? "ACTIVO" : "ANULADO",
         usuario: row.usuario || "",
         observaciones: row.observaciones || "",
+        foto_guia: row.foto_guia || "",
       })),
     });
 
@@ -496,8 +521,8 @@ router.get("/:id", async (req, res) => {
        LEFT JOIN usuarios u ON u.id = t.usuario_id
        LEFT JOIN skus sk ON sk.id = t.sku_origen_id
        LEFT JOIN lotes lo ON lo.id = t.lote_origen_id
-       WHERE t.id = ? AND t.empresa_id = ?`,
-      [req.params.id, req.empresa_id]
+       WHERE t.id = ? AND (? IS NULL OR t.empresa_id = ?)`,
+      [req.params.id, req.empresa_id || null, req.empresa_id || null]
     );
 
     if (!transferencias.length) {
@@ -536,7 +561,8 @@ router.get("/:id", async (req, res) => {
 });
 
 // POST - Crear nueva transferencia
-router.post("/", async (req, res) => {
+router.post("/", upload.single("foto_guia"), async (req, res) => {
+  const uploadedFileName = req.file?.filename || null;
   const {
     almacen_id,
     categoria_origen_id,
@@ -544,8 +570,15 @@ router.post("/", async (req, res) => {
     lote_origen_id,
     cantidad_origen,
     observaciones,
-    detalles,
+    detalles: detallesRaw,
   } = req.body;
+  let detalles = [];
+  try {
+    detalles = parseJsonArray(detallesRaw);
+  } catch {
+    if (uploadedFileName) cleanupUploadedFile(uploadedFileName);
+    return res.status(400).json({ mensaje: "El detalle de destinos no tiene un formato valido" });
+  }
 
   // Validaciones
   if (!almacen_id || !categoria_origen_id || !sku_origen_id || !cantidad_origen) {
@@ -590,6 +623,10 @@ router.post("/", async (req, res) => {
       const skuOrigenId = parsePositiveInt(sku_origen_id);
       const loteOrigenId = parsePositiveInt(lote_origen_id);
       const cantidadOrigenNumber = parsePositiveIntegerQuantity(cantidad_origen);
+      const empresaId = await resolveEmpresaIdForWarehouse(connection, req, almacenId);
+      if (!empresaId) {
+        throw new Error("No se pudo resolver la empresa del almacen seleccionado");
+      }
       if (!cantidadOrigenNumber) {
         throw new Error("La cantidad a trasladar debe ser un entero mayor a 0");
       }
@@ -597,7 +634,7 @@ router.post("/", async (req, res) => {
       const skuOrigen = await validateSkuCategory(connection, {
         sku_id: skuOrigenId,
         categoria_id: categoriaOrigenId,
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
       });
       if (!skuOrigen) {
         throw new Error("El SKU origen no pertenece a la categoria seleccionada");
@@ -607,7 +644,7 @@ router.post("/", async (req, res) => {
       }
 
       const stockDisponible = await getCurrentStockAmount(connection, {
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
         almacen_id: almacenId,
         sku_id: skuOrigenId,
         lote_id: loteOrigenId,
@@ -630,7 +667,7 @@ router.post("/", async (req, res) => {
           ? await validateSkuCategory(connection, {
               sku_id: skuDestinoId,
               categoria_id: categoriaDestinoId,
-              empresa_id: req.empresa_id,
+              empresa_id: empresaId,
             })
           : null;
         if (!skuDestino) {
@@ -639,7 +676,7 @@ router.post("/", async (req, res) => {
             sku_codigo: skuOrigen.codigo,
             sku_zona: skuOrigen.zona,
             categoria_id: categoriaDestinoId,
-            empresa_id: req.empresa_id,
+            empresa_id: empresaId,
           });
           skuDestinoId = skuDestino?.id || null;
         }
@@ -668,10 +705,10 @@ router.post("/", async (req, res) => {
       // Crear transferencia
       const [result] = await connection.query(
         `INSERT INTO tg_interno_transferencias 
-        (empresa_id, almacen_id, categoria_origen_id, sku_origen_id, lote_origen_id, cantidad_origen, usuario_id, observaciones, activo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        (empresa_id, almacen_id, categoria_origen_id, sku_origen_id, lote_origen_id, cantidad_origen, usuario_id, observaciones, foto_guia, activo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
-          req.empresa_id,
+          empresaId,
           almacenId,
           categoriaOrigenId,
           skuOrigenId,
@@ -679,6 +716,7 @@ router.post("/", async (req, res) => {
           cantidadOrigenNumber,
           req.usuario.id,
           observaciones || null,
+          uploadedFileName,
         ]
       );
 
@@ -693,7 +731,7 @@ router.post("/", async (req, res) => {
             sku_codigo: skuOrigen.codigo,
             sku_zona: skuOrigen.zona,
             categoria_id: categoriaDestinoId,
-            empresa_id: req.empresa_id,
+            empresa_id: empresaId,
           })
         )?.id;
         const loteDestinoId = parsePositiveInt(detalle.lote_destino_id);
@@ -707,7 +745,7 @@ router.post("/", async (req, res) => {
         const skuDestino = await validateSkuCategory(connection, {
           sku_id: skuDestinoId,
           categoria_id: categoriaDestinoId,
-          empresa_id: req.empresa_id,
+          empresa_id: empresaId,
         });
         if (parseBooleanFlag(skuDestino?.tiene_lote) && !loteDestinoId) {
           throw new Error(`Selecciona un lote destino para ${skuDestino.nombre}`);
@@ -720,7 +758,7 @@ router.post("/", async (req, res) => {
         );
 
         await upsertStock(connection, {
-          empresa_id: req.empresa_id,
+          empresa_id: empresaId,
           almacen_id: almacenId,
           sku_id: skuDestinoId,
           lote_id: loteDestinoId,
@@ -728,7 +766,7 @@ router.post("/", async (req, res) => {
         });
 
         await insertTgStockMovement(connection, {
-          empresa_id: req.empresa_id,
+          empresa_id: empresaId,
           tg_interno_transferencia_id: transferenciaId,
           almacen_origen_id: almacenId,
           almacen_destino_id: almacenId,
@@ -741,7 +779,7 @@ router.post("/", async (req, res) => {
       }
 
       await upsertStock(connection, {
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
         almacen_id: almacenId,
         sku_id: skuOrigenId,
         lote_id: loteOrigenId,
@@ -749,7 +787,7 @@ router.post("/", async (req, res) => {
       });
 
       await insertTgStockMovement(connection, {
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
         tg_interno_transferencia_id: transferenciaId,
         almacen_origen_id: almacenId,
         almacen_destino_id: almacenId,
@@ -768,6 +806,7 @@ router.post("/", async (req, res) => {
       });
     } catch (err) {
       await connection.rollback();
+      if (uploadedFileName) cleanupUploadedFile(uploadedFileName);
       throw err;
     } finally {
       connection.release();
@@ -779,8 +818,16 @@ router.post("/", async (req, res) => {
 });
 
 // PUT - Editar montos de una transferencia activa
-router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
-  const { cantidad_origen, observaciones, detalles } = req.body;
+router.put("/:id", requireRol("superadmin", "admin"), upload.single("foto_guia"), async (req, res) => {
+  const uploadedFileName = req.file?.filename || null;
+  const { cantidad_origen, observaciones, detalles: detallesRaw } = req.body;
+  let detalles = [];
+  try {
+    detalles = parseJsonArray(detallesRaw);
+  } catch {
+    if (uploadedFileName) cleanupUploadedFile(uploadedFileName);
+    return res.status(400).json({ mensaje: "El detalle de destinos no tiene un formato valido" });
+  }
 
   if (!parsePositiveIntegerQuantity(cantidad_origen)) {
     return res.status(400).json({ mensaje: "La cantidad a trasladar debe ser un entero mayor a 0" });
@@ -806,10 +853,10 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
 
     const [transferencias] = await connection.query(
       `SELECT * FROM tg_interno_transferencias
-       WHERE id = ? AND empresa_id = ?
+       WHERE id = ? AND (? IS NULL OR empresa_id = ?)
        LIMIT 1
        FOR UPDATE`,
-      [req.params.id, req.empresa_id],
+      [req.params.id, req.empresa_id || null, req.empresa_id || null],
     );
 
     if (!transferencias.length) {
@@ -818,6 +865,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     }
 
     const transferencia = transferencias[0];
+    const empresaId = transferencia.empresa_id || req.empresa_id;
     if (!transferencia.activo) {
       await connection.rollback();
       return res.status(400).json({ mensaje: "No se puede editar una transferencia inactiva" });
@@ -842,7 +890,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     }
 
     await upsertStock(connection, {
-      empresa_id: req.empresa_id,
+      empresa_id: empresaId,
       almacen_id: transferencia.almacen_id,
       sku_id: transferencia.sku_origen_id,
       lote_id: transferencia.lote_origen_id,
@@ -851,7 +899,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
 
     for (const detalle of detallesActuales) {
       await upsertStock(connection, {
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
         almacen_id: transferencia.almacen_id,
         sku_id: detalle.sku_destino_id,
         lote_id: detalle.lote_destino_id,
@@ -860,7 +908,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     }
 
     const stockDisponible = await getCurrentStockAmount(connection, {
-      empresa_id: req.empresa_id,
+      empresa_id: empresaId,
       almacen_id: transferencia.almacen_id,
       sku_id: transferencia.sku_origen_id,
       lote_id: transferencia.lote_origen_id,
@@ -878,6 +926,13 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
        WHERE id=?`,
       [cantidadOrigenNumber, observaciones || null, req.params.id],
     );
+    if (uploadedFileName) {
+      await connection.query(
+        "UPDATE tg_interno_transferencias SET foto_guia=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+        [uploadedFileName, req.params.id],
+      );
+      cleanupUploadedFile(transferencia.foto_guia);
+    }
 
     for (const detalle of detalles) {
       const detalleActual = detalleActualPorId.get(Number(detalle.id));
@@ -889,7 +944,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
       );
 
       await upsertStock(connection, {
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
         almacen_id: transferencia.almacen_id,
         sku_id: detalleActual.sku_destino_id,
         lote_id: detalleActual.lote_destino_id,
@@ -898,7 +953,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     }
 
     await upsertStock(connection, {
-      empresa_id: req.empresa_id,
+      empresa_id: empresaId,
       almacen_id: transferencia.almacen_id,
       sku_id: transferencia.sku_origen_id,
       lote_id: transferencia.lote_origen_id,
@@ -913,7 +968,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     for (const detalle of detalles) {
       const detalleActual = detalleActualPorId.get(Number(detalle.id));
       await insertTgStockMovement(connection, {
-        empresa_id: req.empresa_id,
+        empresa_id: empresaId,
         tg_interno_transferencia_id: req.params.id,
         almacen_origen_id: transferencia.almacen_id,
         almacen_destino_id: transferencia.almacen_id,
@@ -926,7 +981,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     }
 
     await insertTgStockMovement(connection, {
-      empresa_id: req.empresa_id,
+      empresa_id: empresaId,
       tg_interno_transferencia_id: req.params.id,
       almacen_origen_id: transferencia.almacen_id,
       almacen_destino_id: transferencia.almacen_id,
@@ -941,6 +996,7 @@ router.put("/:id", requireRol("superadmin", "admin"), async (req, res) => {
     res.json({ mensaje: "Transferencia actualizada exitosamente" });
   } catch (error) {
     await connection.rollback();
+    if (uploadedFileName) cleanupUploadedFile(uploadedFileName);
     console.error("[TG INTERNO PUT]", error);
     res.status(500).json({ mensaje: error.message || "Error al editar transferencia" });
   } finally {
@@ -958,10 +1014,10 @@ router.delete("/:id", requireRol("superadmin", "admin"), async (req, res) => {
 
     const [transferencias] = await connection.query(
       `SELECT * FROM tg_interno_transferencias
-       WHERE id = ? AND empresa_id = ?
+       WHERE id = ? AND (? IS NULL OR empresa_id = ?)
        LIMIT 1
        FOR UPDATE`,
-      [req.params.id, req.empresa_id]
+      [req.params.id, req.empresa_id || null, req.empresa_id || null]
     );
 
     if (!transferencias.length) {

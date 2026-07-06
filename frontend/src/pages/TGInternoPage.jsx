@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "react-toastify";
-import { AlertCircle, ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Plus, Save, Trash2, Upload } from "lucide-react";
 import api from "../utils/api";
 import SearchableSelect from "../components/SearchableSelect";
 
@@ -74,6 +74,7 @@ export default function TGInternoPage() {
   const {
     control,
     handleSubmit,
+    register,
     watch,
     setValue,
     reset,
@@ -86,6 +87,7 @@ export default function TGInternoPage() {
       sku_origen_id: "",
       lote_origen_id: "",
       cantidad_origen: "",
+      foto_guia: null,
       observaciones: "",
       detalles: [{ categoria_destino_id: "", sku_destino_id: "", lote_destino_id: "", cantidad: "" }],
     },
@@ -107,6 +109,7 @@ export default function TGInternoPage() {
   const sourceStockKey = watch("source_stock_key");
   const cantidadOrigen = toNumber(watch("cantidad_origen"));
   const detalles = watch("detalles") || [];
+  const selectedFotoGuia = watch("foto_guia");
 
   const { data: stockOrigen = [], isFetching: loadingStockOrigen } = useQuery({
     queryKey: ["tg-interno-stock", almacenId || "", categoriaOrigenId || ""],
@@ -139,12 +142,14 @@ export default function TGInternoPage() {
       sku_origen_id: String(transferenciaEdit.sku_origen_id || ""),
       lote_origen_id: transferenciaEdit.lote_origen_id ? String(transferenciaEdit.lote_origen_id) : "",
       cantidad_origen: String(Number(transferenciaEdit.cantidad_origen || 0)),
+      foto_guia: null,
       observaciones: transferenciaEdit.observaciones || "",
       detalles: (transferenciaEdit.detalles || []).map((detalle) => ({
         id: detalle.id,
         categoria_destino_id: String(detalle.categoria_destino_id || ""),
         sku_destino_id: detalle.sku_destino_id ? String(detalle.sku_destino_id) : "",
         lote_destino_id: detalle.lote_destino_id ? String(detalle.lote_destino_id) : "",
+        lote_destino_codigo: detalle.lote_destino_codigo || "",
         cantidad: String(Number(detalle.cantidad || 0)),
       })),
     });
@@ -182,25 +187,7 @@ export default function TGInternoPage() {
 
   const almacenOptions = buildSearchOptions(almacenes, (a) => a.nombre);
   const categoriaOptions = buildSearchOptions(categorias, (c) => c.nombre);
-  const categoriesBySkuName = useMemo(() => {
-    const map = new Map();
-    skus.forEach((sku) => {
-      const nameKey = normalizeSkuName(sku.nombre);
-      if (!nameKey || !sku.categoria_id) return;
-      const categories = map.get(nameKey) || new Set();
-      categories.add(String(sku.categoria_id));
-      map.set(nameKey, categories);
-    });
-    return map;
-  }, [skus]);
-
-  const sourceStockOptions = stockOrigen.filter((row) => {
-    const sourceOptionSku = skus.find((sku) => String(sku.id) === String(row.sku_id));
-    return skus.some((sku) => (
-      String(sku.categoria_id) !== String(row.categoria_id) &&
-      isEquivalentSku(sourceOptionSku || row, sku)
-    ));
-  }).map((row) => {
+  const sourceStockOptions = stockOrigen.map((row) => {
     const loteLabel = row.codigo_lote ? `Lote ${row.codigo_lote}` : "SIN LOTE";
     const codigo = row.sku_codigo ? `${row.sku_codigo} - ` : "";
     return {
@@ -256,6 +243,7 @@ export default function TGInternoPage() {
   }, [categoriaOptions, categoriaOrigenId, sourceSku, skus]);
 
   useEffect(() => {
+    if (isEditing) return;
     if (!selectedStock) return;
     const validIds = new Set(validDestinationCategoryOptions.map((option) => option.value));
     detalles.forEach((detalle, index) => {
@@ -265,7 +253,7 @@ export default function TGInternoPage() {
         setValue(`detalles.${index}.lote_destino_id`, "");
       }
     });
-  }, [detalles, selectedStock, setValue, validDestinationCategoryOptions]);
+  }, [detalles, isEditing, selectedStock, setValue, validDestinationCategoryOptions]);
 
   const handleSave = async (data) => {
     if (!data.almacen_id) return toast.error("Selecciona un almacen");
@@ -320,18 +308,40 @@ export default function TGInternoPage() {
           cantidad: detalle.cantidad,
         })),
       };
+      const selectedFile = data.foto_guia?.[0] || null;
 
       if (isEditing) {
-        await api.put(`/tg-interno/${id}`, {
+        if (selectedFile) {
+          const formData = new FormData();
+          formData.append("cantidad_origen", payload.cantidad_origen);
+          formData.append("observaciones", payload.observaciones || "");
+          formData.append("detalles", JSON.stringify(payload.detalles.map((detalle) => ({
+            id: detalle.id,
+            cantidad: detalle.cantidad,
+          }))));
+          formData.append("foto_guia", selectedFile);
+          await api.put(`/tg-interno/${id}`, formData);
+        } else {
+          await api.put(`/tg-interno/${id}`, {
           cantidad_origen: payload.cantidad_origen,
           observaciones: payload.observaciones,
           detalles: payload.detalles.map((detalle) => ({
             id: detalle.id,
             cantidad: detalle.cantidad,
           })),
-        });
+          });
+        }
       } else {
-        await api.post("/tg-interno", payload);
+        const formData = new FormData();
+        formData.append("almacen_id", payload.almacen_id);
+        formData.append("categoria_origen_id", payload.categoria_origen_id);
+        formData.append("sku_origen_id", payload.sku_origen_id);
+        if (payload.lote_origen_id) formData.append("lote_origen_id", payload.lote_origen_id);
+        formData.append("cantidad_origen", payload.cantidad_origen);
+        formData.append("observaciones", payload.observaciones || "");
+        formData.append("detalles", JSON.stringify(payload.detalles));
+        if (selectedFile) formData.append("foto_guia", selectedFile);
+        await api.post("/tg-interno", formData);
       }
 
       toast.success(isEditing ? "Transferencia TG INTERNO actualizada exitosamente" : "Transferencia TG INTERNO registrada exitosamente");
@@ -466,6 +476,35 @@ export default function TGInternoPage() {
                 {...control.register("observaciones")}
               />
             </div>
+
+            <div className="md:col-span-2">
+              <label className="label">Foto guía</label>
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                <Upload size={16} />
+                {selectedFotoGuia?.[0]?.name || "Subir archivo"}
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  className="hidden"
+                  {...register("foto_guia")}
+                />
+              </label>
+              {transferenciaEdit?.foto_guia && (
+                <a
+                  href={`/uploads/${transferenciaEdit.foto_guia}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex text-xs font-medium text-blue-600 hover:text-blue-800"
+                >
+                  Ver sustento actual
+                </a>
+              )}
+              {isEditing && !transferenciaEdit?.foto_guia && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Sin sustento actual guardado. Selecciona un archivo para adjuntarlo.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -584,6 +623,20 @@ function DetailLineRow({
     const vencimiento = lote.fecha_vencimiento ? ` | Vence ${lote.fecha_vencimiento}` : "";
     return `${lote.codigo_lote || "SIN LOTE"}${vencimiento}`;
   });
+  if (
+    isEditing &&
+    loteDestinoId &&
+    !loteDestinoOptions.some((option) => option.value === loteDestinoId)
+  ) {
+    loteDestinoOptions.push({
+      value: loteDestinoId,
+      label: detalle?.lote_destino_codigo || `Lote ${loteDestinoId}`,
+      raw: {
+        id: loteDestinoId,
+        codigo_lote: detalle?.lote_destino_codigo || "",
+      },
+    });
+  }
 
   const matchingDestinationLot = useMemo(() => {
     const sourceLotCode = normalizeSkuName(selectedStock?.codigo_lote);
@@ -592,6 +645,7 @@ function DetailLineRow({
   }, [lotesDestino, selectedStock?.codigo_lote]);
 
   useEffect(() => {
+    if (isEditing) return;
     if (!categoriaDestinoId || !sourceName) {
       setValue(`detalles.${index}.sku_destino_id`, "");
       setValue(`detalles.${index}.lote_destino_id`, "");
@@ -608,7 +662,7 @@ function DetailLineRow({
     if (!skuDestinoId && firstMatchValue) {
       setValue(`detalles.${index}.sku_destino_id`, firstMatchValue);
     }
-  }, [categoriaDestinoId, firstMatchValue, index, matchingSkuOptions, setValue, skuDestinoId, sourceName]);
+  }, [categoriaDestinoId, firstMatchValue, index, isEditing, matchingSkuOptions, setValue, skuDestinoId, sourceName]);
 
   useEffect(() => {
     if (!selectedDestinationSkuUsesLot || loadingLotesDestino || loteDestinoId) return;
