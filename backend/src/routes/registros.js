@@ -3978,7 +3978,7 @@ router.get(
 
       let query = `SELECT
         sm.id,
-        sm.created_at AS movimiento_fecha,
+        COALESCE(r.fecha, sm.created_at) AS movimiento_fecha,
         sm.tipo_movimiento,
         sm.cantidad,
         sm.almacen_origen_id,
@@ -4058,7 +4058,7 @@ router.get(
         params.push(req.query.vencimiento_hasta);
       }
       if (fechaFin) {
-        query += " AND DATE(sm.created_at) <= ?";
+        query += " AND DATE(COALESCE(r.fecha, sm.created_at)) <= ?";
         params.push(fechaFin);
       }
 
