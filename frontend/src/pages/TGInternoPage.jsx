@@ -110,6 +110,7 @@ export default function TGInternoPage() {
   const cantidadOrigen = toNumber(watch("cantidad_origen"));
   const detalles = watch("detalles") || [];
   const selectedFotoGuia = watch("foto_guia");
+  const fotoGuiaDisponible = Boolean(selectedFotoGuia?.[0] || transferenciaEdit?.foto_guia);
 
   const { data: stockOrigen = [], isFetching: loadingStockOrigen } = useQuery({
     queryKey: ["tg-interno-stock", almacenId || "", categoriaOrigenId || ""],
@@ -256,6 +257,10 @@ export default function TGInternoPage() {
   }, [detalles, isEditing, selectedStock, setValue, validDestinationCategoryOptions]);
 
   const handleSave = async (data) => {
+    const selectedFile = data.foto_guia?.[0] || null;
+    if (!selectedFile && !transferenciaEdit?.foto_guia) {
+      return toast.error("La foto guía es obligatoria");
+    }
     if (!data.almacen_id) return toast.error("Selecciona un almacen");
     if (!data.categoria_origen_id) return toast.error("Selecciona categoria origen");
     if (!data.sku_origen_id) return toast.error("Selecciona el SKU origen con stock");
@@ -308,8 +313,6 @@ export default function TGInternoPage() {
           cantidad: detalle.cantidad,
         })),
       };
-      const selectedFile = data.foto_guia?.[0] || null;
-
       if (isEditing) {
         if (selectedFile) {
           const formData = new FormData();
@@ -494,6 +497,11 @@ export default function TGInternoPage() {
                 />
               </label>
               {errors.foto_guia && <p className="error-msg">{errors.foto_guia.message}</p>}
+              {!fotoGuiaDisponible && (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  Debes adjuntar una foto guía para registrar el TG Interno.
+                </p>
+              )}
               {transferenciaEdit?.foto_guia && (
                 <a
                   href={`/uploads/${transferenciaEdit.foto_guia}`}
@@ -573,9 +581,9 @@ export default function TGInternoPage() {
           </button>
           <button
             type="submit"
-            disabled={saving || !coinciden || !stockSuficiente}
+            disabled={saving || !coinciden || !stockSuficiente || !fotoGuiaDisponible}
             className="btn-primary"
-            title={!stockSuficiente ? "Selecciona SKU y cantidad con stock suficiente" : !coinciden ? "Las cantidades deben coincidir" : ""}
+            title={!fotoGuiaDisponible ? "Adjunta la foto guía obligatoria" : !stockSuficiente ? "Selecciona SKU y cantidad con stock suficiente" : !coinciden ? "Las cantidades deben coincidir" : ""}
           >
             {saving ? "Guardando..." : <><Save size={15} /> Guardar Transferencia</>}
           </button>
