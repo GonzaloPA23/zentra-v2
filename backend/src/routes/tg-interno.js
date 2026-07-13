@@ -584,6 +584,9 @@ router.post("/", upload.single("foto_guia"), async (req, res) => {
   if (!almacen_id || !categoria_origen_id || !sku_origen_id || !cantidad_origen) {
     return res.status(400).json({ mensaje: "Faltan datos requeridos" });
   }
+  if (!uploadedFileName) {
+    return res.status(400).json({ mensaje: "Foto guia requerida" });
+  }
 
   if (!Array.isArray(detalles) || detalles.length < 1) {
     return res.status(400).json({ mensaje: "Debe haber mínimo 1 destino" });
@@ -869,6 +872,10 @@ router.put("/:id", requireRol("superadmin", "admin"), upload.single("foto_guia")
     if (!transferencia.activo) {
       await connection.rollback();
       return res.status(400).json({ mensaje: "No se puede editar una transferencia inactiva" });
+    }
+    if (!uploadedFileName && !transferencia.foto_guia) {
+      await connection.rollback();
+      return res.status(400).json({ mensaje: "Foto guia requerida" });
     }
 
     const [detallesActuales] = await connection.query(

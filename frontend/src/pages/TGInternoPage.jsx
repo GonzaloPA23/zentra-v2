@@ -478,7 +478,7 @@ export default function TGInternoPage() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="label">Foto guía</label>
+              <label className="label">Foto guía <span className="text-red-500">*</span></label>
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
                 <Upload size={16} />
                 {selectedFotoGuia?.[0]?.name || "Subir archivo"}
@@ -486,9 +486,14 @@ export default function TGInternoPage() {
                   type="file"
                   accept=".jpg,.jpeg,.png,.pdf"
                   className="hidden"
-                  {...register("foto_guia")}
+                  {...register("foto_guia", {
+                    validate: (files) => (
+                      files?.length || transferenciaEdit?.foto_guia ? true : "Foto guía requerida"
+                    ),
+                  })}
                 />
               </label>
+              {errors.foto_guia && <p className="error-msg">{errors.foto_guia.message}</p>}
               {transferenciaEdit?.foto_guia && (
                 <a
                   href={`/uploads/${transferenciaEdit.foto_guia}`}
