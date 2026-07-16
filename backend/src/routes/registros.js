@@ -4521,6 +4521,98 @@ router.post(
   },
 );
 
+// GET /registros/stock-disponible?almacen_id=X&sku_id=Y&registro_id=Z
+// Expone el mismo calculo usado al validar una salida para que el formulario
+// pueda mostrar el stock de los SKU que no manejan lote.
+router.get("/stock-disponible", async (req, res) => {
+  try {
+    const almacenId = parsePositiveInt(req.query.almacen_id);
+    const skuId = parsePositiveInt(req.query.sku_id);
+    const registroId = parsePositiveInt(req.query.registro_id);
+
+    if (!almacenId || !skuId) {
+      return sendBadRequest(res, "almacen_id y sku_id son requeridos");
+    }
+
+    const scope = await getWarehouseScope(req, "r", pool);
+    if (scope.ids.length && !scope.ids.includes(almacenId)) {
+      return res.status(403).json({
+        ok: false,
+        mensaje: "Sin acceso al almacen solicitado",
+      });
+    }
+
+    const [skuRows] = await pool.query(
+      `SELECT s.id
+       FROM skus s
+       WHERE s.id=?${req.empresa_id ? " AND s.empresa_id=?" : ""}
+       LIMIT 1`,
+      req.empresa_id ? [skuId, req.empresa_id] : [skuId],
+    );
+    if (!skuRows.length) {
+      return res.status(404).json({ ok: false, mensaje: "SKU no encontrado" });
+    }
+
+    const [warehouseRows] = await pool.query(
+      `SELECT a.id
+       FROM almacenes a
+       JOIN ciudades c ON c.id=a.ciudad_id
+       JOIN regiones r ON r.id=c.region_id
+       WHERE a.id=?${req.empresa_id ? " AND r.empresa_id=?" : ""}
+       LIMIT 1`,
+      req.empresa_id ? [almacenId, req.empresa_id] : [almacenId],
+    );
+    if (!warehouseRows.length) {
+      return res
+        .status(404)
+        .json({ ok: false, mensaje: "Almacen no encontrado" });
+    }
+
+    let stockDisponible = await getCurrentStockAmount(pool, {
+      empresa_id: req.empresa_id,
+      almacen_id: almacenId,
+      sku_id: skuId,
+      lote_id: null,
+    });
+
+    // Durante una edicion se repone temporalmente la cantidad de la salida
+    // actual, igual que en el selector de lotes, para mostrar lo editable.
+    if (registroId) {
+      const [previousRows] = await pool.query(
+        `SELECT COALESCE(SUM(rd.cantidad), 0) AS cantidad
+         FROM registro_detalles rd
+         JOIN registros r ON r.id=rd.registro_id
+         WHERE r.id=?
+           AND r.tipo_accion='SALIDA'
+           AND r.almacen_origen_id=?
+           AND rd.sku_id=?
+           AND rd.lote_id IS NULL
+           AND r.eliminado_at IS NULL
+           ${req.empresa_id ? "AND r.empresa_id=?" : ""}`,
+        req.empresa_id
+          ? [registroId, almacenId, skuId, req.empresa_id]
+          : [registroId, almacenId, skuId],
+      );
+      stockDisponible += Number(previousRows[0]?.cantidad || 0);
+    }
+
+    res.json({
+      ok: true,
+      datos: {
+        almacen_id: almacenId,
+        sku_id: skuId,
+        stock_disponible: Math.max(0, stockDisponible),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(err.statusCode || 500).json({
+      ok: false,
+      mensaje: err.message || "Error al consultar el stock disponible",
+    });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   try {
     const id = parsePositiveInt(req.params.id);

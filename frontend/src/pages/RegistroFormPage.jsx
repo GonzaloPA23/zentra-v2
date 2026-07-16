@@ -265,6 +265,8 @@ function DetalleRow({
     () => skus.find((sku) => String(sku.id) === String(skuId)),
     [skus, skuId],
   );
+  const skuManejaLote = parseFlag(skuSeleccionado?.tiene_lote);
+  const skuManejaVencimiento = parseFlag(skuSeleccionado?.tiene_vencimiento);
   const shouldFilterLotesByStock = tipoAccion === "SALIDA";
   const lotesQueryKey = [
     "registro-line-lotes",
@@ -290,7 +292,7 @@ function DetalleRow({
         .get(`/catalogos/lotes?${params.toString()}`)
         .then((response) => response.data.datos);
     },
-    enabled: !!skuId && (!shouldFilterLotesByStock || !!almacenOrigenId) && parseFlag(skuSeleccionado?.tiene_lote),
+    enabled: !!skuId && (!shouldFilterLotesByStock || !!almacenOrigenId) && skuManejaLote,
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: "always",
@@ -299,8 +301,38 @@ function DetalleRow({
     () => lotes.find((lote) => String(lote.id) === String(loteId)),
     [lotes, loteId],
   );
-  const skuManejaLote = parseFlag(skuSeleccionado?.tiene_lote);
-  const skuManejaVencimiento = parseFlag(skuSeleccionado?.tiene_vencimiento);
+  const {
+    data: stockSinLote,
+    isFetching: loadingStockSinLote,
+    isError: stockSinLoteQueryFailed,
+    error: stockSinLoteQueryError,
+  } = useQuery({
+    queryKey: [
+      "registro-line-stock-sin-lote",
+      almacenOrigenId || "",
+      skuId || "",
+      isEditing && registroId ? `registro-${registroId}` : "",
+    ],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        almacen_id: almacenOrigenId,
+        sku_id: skuId,
+      });
+      if (isEditing && registroId) params.set("registro_id", registroId);
+      return api
+        .get(`/registros/stock-disponible?${params.toString()}`)
+        .then((response) => response.data.datos);
+    },
+    enabled:
+      shouldFilterLotesByStock &&
+      !!almacenOrigenId &&
+      !!skuId &&
+      !!skuSeleccionado &&
+      !skuManejaLote,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+  });
   const fechaBloqueada = true;
 
   useEffect(() => {
@@ -611,6 +643,11 @@ function DetalleRow({
               Este SKU no maneja lotes.
             </p>
           )}
+          {stockSinLoteQueryFailed && !skuManejaLote && (
+            <p className="error-msg">
+              No se pudo consultar el stock. {getMensajeError(stockSinLoteQueryError)}
+            </p>
+          )}
           {lotesQueryFailed && skuManejaLote && (
             <p className="error-msg">
               No se pudieron cargar los lotes.{" "}
@@ -695,6 +732,16 @@ function DetalleRow({
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
               <Boxes size={12} />
               Lote
+            </span>
+          )}
+          {shouldFilterLotesByStock && !skuManejaLote && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">
+              <Boxes size={12} />
+              {loadingStockSinLote
+                ? "Consultando stock..."
+                : stockSinLoteQueryFailed
+                  ? "Stock no disponible"
+                  : `Stock disponible: ${Number(stockSinLote?.stock_disponible || 0).toLocaleString("es-PE")}`}
             </span>
           )}
         </div>
