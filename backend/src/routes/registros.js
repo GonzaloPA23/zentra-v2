@@ -4734,13 +4734,10 @@ router.put(
 
       let approvedMovementsBefore = [];
       let previousOriginRequirements = new Map();
-      const useApprovedEntryDelta = isApprovedEdit && isEntradaRegistro(existing);
       if (isApprovedEdit) {
         approvedMovementsBefore = await getRegistroStockMovements(connection, id);
         previousOriginRequirements = buildPreviousOriginRequirements(approvedMovementsBefore);
-        if (!useApprovedEntryDelta) {
-          await reverseRecordedStockMovements(connection, id);
-        }
+        await reverseRecordedStockMovements(connection, id);
       } else {
         previousOriginRequirements = await buildPendingEditOriginRequirements(
           connection,
@@ -4808,18 +4805,9 @@ router.put(
       let approvedMovementsAfter = [];
 
       if (isApprovedEdit) {
-        if (useApprovedEntryDelta) {
-          await applyApprovedEntryStockDelta(
-            connection,
-            approvedMovementsBefore,
-            updatedRegistro,
-            req.usuario.id,
-          );
-        } else {
-          await applyApprovalStock(connection, updatedRegistro, {
-            previousRequiredByKey: previousOriginRequirements,
-          });
-        }
+        await applyApprovalStock(connection, updatedRegistro, {
+          previousRequiredByKey: previousOriginRequirements,
+        });
         approvedMovementsAfter = await getRegistroStockMovements(connection, id);
         updatedRegistro = await getRegistroById(connection, req, id);
 
