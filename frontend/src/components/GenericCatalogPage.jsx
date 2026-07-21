@@ -105,7 +105,7 @@ export default function GenericCatalogPage({
       const response = await api.get(`${endpoint}/export/excel?incluir_inactivos=1`, {
         responseType: "blob",
       });
-      downloadBlobResponse(response, exportFileName);
+      await downloadBlobResponse(response, exportFileName);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error, "No se pudo exportar el catálogo"));
     } finally {

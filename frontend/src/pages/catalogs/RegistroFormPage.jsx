@@ -17,7 +17,7 @@ import {
 import api, { getMensajeError } from "../utils/api";
 import SearchableSelect from "../components/SearchableSelect";
 import { getPeruTodayDateInputValue, toSafeDateInputValue } from "../utils/date";
-import { getBlobErrorMessage } from "../utils/download";
+import { downloadBlobResponse, getBlobErrorMessage } from "../utils/download";
 
 const ACCIONES = ["MERMA", "DESPACHO A CANJISTAS", "OTROS MOVIMIENTOS"];
 const TIPO_ACCION_OPTIONS = [
@@ -1064,13 +1064,9 @@ export default function RegistroFormPage() {
     try {
       const response = await api.get(`/registros/${id}/export/excel`, {
         responseType: "blob",
+        timeout: 120_000,
       });
-      const url = URL.createObjectURL(response.data);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `zentra_registro_${id}.xlsx`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      await downloadBlobResponse(response, `zentra_registro_${id}.xlsx`);
     } catch (err) {
       toast.error(
         await getBlobErrorMessage(err, "No se pudo descargar el detalle"),

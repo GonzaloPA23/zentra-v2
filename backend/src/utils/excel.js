@@ -124,6 +124,10 @@ function addWorksheetRows(worksheet, columns = [], rows = []) {
 }
 
 async function sendWorkbook(res, workbook, fileName) {
+  // Generar el archivo completo antes de responder evita descargas truncadas
+  // por proxies o navegadores cuando la respuesta se envia por streaming.
+  const workbookBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
   res.setHeader(
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -135,9 +139,9 @@ async function sendWorkbook(res, workbook, fileName) {
     'Content-Disposition',
     `attachment; filename="${sanitizeFileName(fileName)}.xlsx"`
   );
+  res.setHeader('Content-Length', String(workbookBuffer.length));
 
-  await workbook.xlsx.write(res);
-  res.end();
+  res.status(200).end(workbookBuffer);
 }
 
 async function sendExcelWorkbook(res, {
