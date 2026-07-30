@@ -202,6 +202,36 @@ function isEntradaRegistro(registro = {}) {
   return String(registro.tipo_accion || "").trim().toUpperCase() === "ENTRADA";
 }
 
+function getExternalMovementPresentation(registro = {}) {
+  const almacenOrigen = registro.almacen_origen || "";
+  const almacenDestino = registro.almacen_destino || "";
+  const isMolitalia = isTgMolitaliaIndicator(
+    registro.indicador_nombre || registro.indicador || "",
+  );
+
+  if (!isMolitalia) {
+    return {
+      almacen_origen_display: almacenOrigen,
+      almacen_destino_display: almacenDestino,
+      contraparte_externa: "",
+    };
+  }
+
+  if (isSalidaRegistro(registro)) {
+    return {
+      almacen_origen_display: almacenOrigen,
+      almacen_destino_display: "MOLITALIA (EXTERNO)",
+      contraparte_externa: "MOLITALIA",
+    };
+  }
+
+  return {
+    almacen_origen_display: "MOLITALIA (EXTERNO)",
+    almacen_destino_display: almacenDestino || almacenOrigen,
+    contraparte_externa: "MOLITALIA",
+  };
+}
+
 function hasSameOriginDestination(registro = {}) {
   const originId = parsePositiveInt(registro.almacen_origen_id);
   const destinationId = parsePositiveInt(registro.almacen_destino_id);
@@ -839,9 +869,11 @@ async function attachRegistroDetails(executor, registros) {
       : detalles.length === 1
         ? skuPrincipal
         : `${skuPrincipal} +${detalles.length - 1} más`;
+    const externalPresentation = getExternalMovementPresentation(registro);
 
     return {
       ...registro,
+      ...externalPresentation,
       cantidad_total: cantidadTotal,
       detalles_count:
         detalles.length || Number(registro.detalles_count || 0) || 1,
@@ -1585,11 +1617,7 @@ async function applyApprovalStock(executor, registro, options = {}) {
   const detalles = Array.isArray(registro.detalles) ? registro.detalles : [];
   if (!detalles.length) return;
 
-  const isMolitaliaEntry = isTgMolitaliaIndicator(
-    registro.indicador_nombre || registro.indicador || "",
-  );
-
-  if (!isMolitaliaEntry && !isEntradaRegistro(registro)) {
+  if (!isEntradaRegistro(registro)) {
     await applyStockMovementBatch(
       executor,
       registro,
@@ -1863,30 +1891,9 @@ async function validateRegistroPayloadV2(
   const [indicatorRows] = await executor.query(indicatorQuery, indicatorParams);
   if (!indicatorRows.length) throw new Error("Indicador no encontrado");
   const indicator = indicatorRows[0];
-  const isMolitaliaEntry = isTgMolitaliaIndicator(indicator.nombre);
+  const isMolitalia = isTgMolitaliaIndicator(indicator.nombre);
 
-  console.log(
-    "[DEBUG] Indicador:",
-    indicator.nombre,
-    "| Normalizado:",
-    normalizeLookupText(indicator.nombre),
-    "| isMolitalia:",
-    isMolitaliaEntry,
-    "| tipoAccion:",
-    payload.tipo_accion,
-    "| origen:",
-    almacenOrigenId,
-    "| destino:",
-    almacenDestinoId,
-  );
-
-  if (
-    isMolitaliaEntry &&
-    String(payload.tipo_accion || "").toUpperCase() !== "ENTRADA"
-  ) {
-    throw new Error("Para TG MOLITALIA el tipo de acción debe ser ENTRADA");
-  }
-  if (isMolitaliaEntry && almacenOrigenId !== almacenDestinoId) {
+  if (isMolitalia && almacenOrigenId !== almacenDestinoId) {
     throw new Error(
       "Para TG MOLITALIA el almacén destino debe ser igual al almacén origen",
     );
@@ -2054,11 +2061,7 @@ async function validateRegistroPayloadV2(
     });
   });
 
-  if (
-    !isMolitaliaEntry &&
-    !isEntradaRegistro(payload) &&
-    !skipStockAvailability
-  ) {
+  if (!isEntradaRegistro(payload) && !skipStockAvailability) {
     await ensureStockAvailabilityForBatch(
       executor,
       {
@@ -3248,6 +3251,7 @@ function mapRegistroExportRows(registros = [], { req } = {}) {
   const rows = [];
 
   registros.forEach((registro) => {
+    const externalPresentation = getExternalMovementPresentation(registro);
     const detalles =
       Array.isArray(registro.detalles) && registro.detalles.length
         ? registro.detalles
@@ -3267,8 +3271,15 @@ function mapRegistroExportRows(registros = [], { req } = {}) {
         fecha: registro.fecha ? new Date(registro.fecha) : null,
         zona: registro.zona || getZonaFromCityName(registro.ciudad_nombre),
         ciudad: registro.ciudad_nombre || "",
-        almacen_origen: registro.almacen_origen || "",
-        almacen_destino: registro.almacen_destino || "",
+        almacen_origen:
+          registro.almacen_origen_display ||
+          externalPresentation.almacen_origen_display,
+        almacen_destino:
+          registro.almacen_destino_display ||
+          externalPresentation.almacen_destino_display,
+        contraparte_externa:
+          registro.contraparte_externa ||
+          externalPresentation.contraparte_externa,
         categoria: registro.categoria_nombre || "",
         accion: registro.accion || "",
         tipo_accion: registro.tipo_accion || "",
@@ -3916,6 +3927,11 @@ router.get(
           { header: "CIUDAD", key: "ciudad", width: 18 },
           { header: "ALMACEN ORIGEN", key: "almacen_origen", width: 24 },
           { header: "ALMACEN DESTINO", key: "almacen_destino", width: 24 },
+          {
+            header: "CONTRAPARTE EXTERNA",
+            key: "contraparte_externa",
+            width: 24,
+          },
           { header: "CATEGORIA", key: "categoria", width: 18 },
           { header: "ACCION", key: "accion", width: 24 },
           { header: "TIPO ACCION", key: "tipo_accion", width: 16 },
@@ -4656,6 +4672,11 @@ router.get("/:id/export/excel", async (req, res) => {
         { header: "CIUDAD", key: "ciudad", width: 18 },
         { header: "ALMACEN ORIGEN", key: "almacen_origen", width: 24 },
         { header: "ALMACEN DESTINO", key: "almacen_destino", width: 24 },
+        {
+          header: "CONTRAPARTE EXTERNA",
+          key: "contraparte_externa",
+          width: 24,
+        },
         { header: "CATEGORIA", key: "categoria", width: 18 },
         { header: "ACCION", key: "accion", width: 24 },
         { header: "TIPO ACCION", key: "tipo_accion", width: 16 },
@@ -5001,17 +5022,16 @@ router.patch(
         validated.detalles,
       );
 
-      const isMolitaliaEntry = isTgMolitaliaIndicator(
-        existing.indicador_nombre || existing.indicador || "",
-      );
-      if (existing.estado === "en_transito" && !isMolitaliaEntry) {
+      if (existing.estado === "en_transito") {
         const updatedForStock = await getRegistroById(connection, req, id);
-        await applyStockMovementBatch(
-          connection,
-          updatedForStock,
-          "SALIDA_TRANSITO",
-          req.usuario.id,
-        );
+        if (!isEntradaRegistro(updatedForStock)) {
+          await applyStockMovementBatch(
+            connection,
+            updatedForStock,
+            "SALIDA_TRANSITO",
+            req.usuario.id,
+          );
+        }
       }
 
       const updatedRegistro = await getRegistroById(connection, req, id);
@@ -5071,14 +5091,8 @@ router.patch(
       await connection.beginTransaction();
 
       if (existing.estado !== estado) {
-        // Detectar si el registro corresponde a TG MOLITALIA
-        const isMolitaliaEntry = isTgMolitaliaIndicator(
-          existing.indicador_nombre || existing.indicador || "",
-        );
-
-        // Para registros TG MOLITALIA no aplicamos SALIDA_TRANSITO (solo ingreso)
         if (existing.estado === "pendiente" && estado === "en_transito") {
-          if (!isMolitaliaEntry && !isEntradaRegistro(existing)) {
+          if (!isEntradaRegistro(existing)) {
             await applyStockMovementBatch(
               connection,
               existing,
@@ -5087,8 +5101,8 @@ router.patch(
             );
           }
         } else if (existing.estado === "pendiente" && estado === "aprobado") {
-          if (isMolitaliaEntry || isEntradaRegistro(existing)) {
-            // Entradas y TG MOLITALIA solo registran ingreso aprobado.
+          if (isEntradaRegistro(existing)) {
+            // Las entradas solo registran el ingreso aprobado.
             if (shouldApplyApprovedDestinationStock(existing)) {
               await applyStockMovementBatch(
                 connection,

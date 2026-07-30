@@ -322,8 +322,8 @@ function RegistroRow({ row, expanded, onToggle, canManageStates, onAprobar, onRe
       <tr className="cursor-pointer" onClick={() => onToggle(row.id)}>
         <td className="font-semibold text-gray-900">{row.id}</td>
         <td className="whitespace-nowrap font-medium">{formatSafeDate(row.fecha)}</td>
-        <td className="max-w-[180px] truncate" title={row.almacen_origen || ''}>{row.almacen_origen || '-'}</td>
-        <td className="max-w-[180px] truncate" title={row.almacen_destino || ''}>{row.almacen_destino || '-'}</td>
+        <td className="max-w-[180px] truncate" title={row.almacen_origen_display || row.almacen_origen || ''}>{row.almacen_origen_display || row.almacen_origen || '-'}</td>
+        <td className="max-w-[180px] truncate" title={row.almacen_destino_display || row.almacen_destino || ''}>{row.almacen_destino_display || row.almacen_destino || '-'}</td>
         <td>{row.categoria_nombre || '-'}</td>
         <td><span className={TIPO_BADGE[row.tipo_accion] || 'badge-gray'}>{row.tipo_accion || '-'}</span></td>
         <td className="max-w-[240px] truncate" title={row.sku_resumen || ''}>{row.sku_resumen || '-'}</td>

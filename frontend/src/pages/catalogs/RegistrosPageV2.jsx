@@ -678,14 +678,14 @@ function RegistroRow({
       <tr className="cursor-pointer" onClick={() => onToggle(row.id)}>
         <td className="font-semibold text-gray-900">{row.id}</td>
         <td className="whitespace-nowrap">{formatSafeDate(row.fecha)}</td>
-        <td className="max-w-[180px] truncate" title={row.almacen_origen || ""}>
-          {row.almacen_origen || "-"}
+        <td className="max-w-[180px] truncate" title={row.almacen_origen_display || row.almacen_origen || ""}>
+          {row.almacen_origen_display || row.almacen_origen || "-"}
         </td>
         <td
           className="max-w-[180px] truncate"
-          title={row.almacen_destino || ""}
+          title={row.almacen_destino_display || row.almacen_destino || ""}
         >
-          {row.almacen_destino || "-"}
+          {row.almacen_destino_display || row.almacen_destino || "-"}
         </td>
         <td>{row.categoria_nombre || "-"}</td>
         <td>

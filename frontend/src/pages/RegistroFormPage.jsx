@@ -86,7 +86,9 @@ function normalizeLookupText(value) {
     .trim()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[.,;:\-]/g, " ")
     .replace(/\s+/g, " ")
+    .trim()
     .toUpperCase();
 }
 
@@ -1098,12 +1100,6 @@ export default function RegistroFormPage() {
       });
     }
 
-    if (getValues("tipo_accion") !== "ENTRADA") {
-      setValue("tipo_accion", "ENTRADA", {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-    }
   }, [getValues, isTgMolitalia, indicadorId, setValue, almacenOrigenId]);
 
   useEffect(() => {
@@ -1246,11 +1242,22 @@ export default function RegistroFormPage() {
       payload.append("observaciones", data.observaciones);
       payload.append("detalles", JSON.stringify(data.detalles));
 
+      const empresaIdRegistro =
+        usuario?.empresa_id || indicadorSeleccionado?.empresa_id || null;
+      if (empresaIdRegistro) {
+        payload.append("empresa_id", String(empresaIdRegistro));
+      }
+
       if (fotoFile) {
         payload.append("foto_guia", fotoFile);
       }
 
-      const config = { headers: { "Content-Type": "multipart/form-data" } };
+      const config = {
+        headers: { "Content-Type": "multipart/form-data" },
+        params: empresaIdRegistro
+          ? { empresa_id: empresaIdRegistro }
+          : undefined,
+      };
       if (isEditing) {
         await api.put(`/registros/${id}`, payload, config);
         toast.success("Registro actualizado");
@@ -1398,7 +1405,14 @@ export default function RegistroFormPage() {
 
               <div>
                 <label className="label">
-                  Almacén origen <span className="text-red-500">*</span>
+                  {isTgMolitalia
+                    ? tipoAccion === "ENTRADA"
+                      ? "Almacén receptor"
+                      : tipoAccion === "SALIDA"
+                        ? "Almacén origen"
+                        : "Almacén afectado"
+                    : "Almacén origen"}{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
                   control={control}
@@ -1422,21 +1436,42 @@ export default function RegistroFormPage() {
 
               <div>
                 <label className="label">
-                  Almacén destino <span className="text-red-500">*</span>
+                  {isTgMolitalia
+                    ? tipoAccion === "ENTRADA"
+                      ? "Origen externo"
+                      : tipoAccion === "SALIDA"
+                        ? "Destino externo"
+                        : "Contraparte externa"
+                    : "Almacén destino"}{" "}
+                  <span className="text-red-500">*</span>
                 </label>
-                <SearchableSelect
-                  control={control}
-                  name="almacen_destino_id"
-                  rules={{ required: "Requerido" }}
-                  options={almacenDestinoOptions}
-                  placeholder={
-                    zona
-                      ? "Seleccionar almacén destino..."
-                      : "Primero selecciona zona"
-                  }
-                  disabled={!zona || isTgMolitalia}
-                  emptyText="Sin almacenes para la zona"
-                />
+                {isTgMolitalia ? (
+                  <>
+                    <input
+                      type="hidden"
+                      {...register("almacen_destino_id", {
+                        required: "Requerido",
+                      })}
+                    />
+                    <div className="input flex items-center bg-amber-50 font-medium text-amber-800">
+                      MOLITALIA (EXTERNO)
+                    </div>
+                  </>
+                ) : (
+                  <SearchableSelect
+                    control={control}
+                    name="almacen_destino_id"
+                    rules={{ required: "Requerido" }}
+                    options={almacenDestinoOptions}
+                    placeholder={
+                      zona
+                        ? "Seleccionar almacén destino..."
+                        : "Primero selecciona zona"
+                    }
+                    disabled={!zona}
+                    emptyText="Sin almacenes para la zona"
+                  />
+                )}
                 {errors.almacen_destino_id && (
                   <p className="error-msg">
                     {errors.almacen_destino_id.message}
@@ -1444,7 +1479,8 @@ export default function RegistroFormPage() {
                 )}
                 {isTgMolitalia && (
                   <p className="mt-1 text-xs text-amber-600">
-                    TG MOLITALIA usa el mismo almacén que el origen.
+                    Molitalia es una contraparte externa y no tiene stock en
+                    Zentra.
                   </p>
                 )}
               </div>
@@ -1478,14 +1514,14 @@ export default function RegistroFormPage() {
                   rules={{ required: "Requerido" }}
                   options={TIPO_ACCION_OPTIONS}
                   placeholder="Seleccionar tipo..."
-                  disabled={isTgMolitalia}
                 />
                 {errors.tipo_accion && (
                   <p className="error-msg">{errors.tipo_accion.message}</p>
                 )}
                 {isTgMolitalia && (
                   <p className="mt-1 text-xs text-amber-600">
-                    TG MOLITALIA requiere tipo de acción ENTRADA.
+                    Selecciona ENTRADA si Molitalia envía productos o SALIDA si
+                    se envían productos a Molitalia.
                   </p>
                 )}
               </div>
