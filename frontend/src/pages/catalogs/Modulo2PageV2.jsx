@@ -609,7 +609,7 @@ export default function Modulo2PageV2() {
       const response = await api.get(`/registros/export/excel?${params.toString()}`, {
         responseType: 'blob',
       });
-      downloadBlobResponse(response, fallbackName);
+      await downloadBlobResponse(response, fallbackName);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));
     }

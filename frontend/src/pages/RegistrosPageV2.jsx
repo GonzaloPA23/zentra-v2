@@ -826,8 +826,9 @@ export default function RegistrosPageV2() {
 
       const response = await api.get(`${endpoint}?${params.toString()}`, {
         responseType: "blob",
+        timeout: 120_000,
       });
-      downloadBlobResponse(response, fallbackName);
+      await downloadBlobResponse(response, fallbackName);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));
     }
@@ -837,8 +838,9 @@ export default function RegistrosPageV2() {
     try {
       const response = await api.get(`/registros/${registroId}/export/excel`, {
         responseType: "blob",
+        timeout: 120_000,
       });
-      downloadBlobResponse(response, `zentra_registro_${registroId}.xlsx`);
+      await downloadBlobResponse(response, `zentra_registro_${registroId}.xlsx`);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));
     }

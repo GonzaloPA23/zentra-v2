@@ -89,7 +89,7 @@ export default function HistorialPageV2() {
       const response = await api.get(`/auditoria/registros/export/excel?${params.toString()}`, {
         responseType: 'blob',
       });
-      downloadBlobResponse(response, `zentra_historial_${Date.now()}.xlsx`);
+      await downloadBlobResponse(response, `zentra_historial_${Date.now()}.xlsx`);
     } catch (error) {
       toast.error(getMensajeError(error));
     }

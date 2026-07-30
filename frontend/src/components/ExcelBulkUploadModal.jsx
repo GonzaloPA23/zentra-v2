@@ -51,7 +51,7 @@ export default function ExcelBulkUploadModal({
     setDownloading(true);
     try {
       const response = await api.get(templateEndpoint, { responseType: 'blob' });
-      downloadBlobResponse(response, templateFileName);
+      await downloadBlobResponse(response, templateFileName);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error, 'No se pudo descargar la plantilla'));
     } finally {

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Download, ArrowLeft, Edit, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import api from "../utils/api";
+import { downloadBlobResponse, getBlobErrorMessage } from "../utils/download";
 import DataTable from "../components/DataTable";
 import { useAuth } from "../context/AuthContext";
 
@@ -139,16 +140,15 @@ export default function TGInternoListadoPage() {
     try {
       const response = await api.get("/tg-interno/export", {
         responseType: "blob",
+        timeout: 120_000,
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `tg-interno-${new Date().toISOString().split("T")[0]}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
+      await downloadBlobResponse(
+        response,
+        `tg-interno-${new Date().toISOString().split("T")[0]}.xlsx`,
+      );
     } catch (error) {
       console.error("Error al exportar:", error);
+      toast.error(await getBlobErrorMessage(error, "No se pudo exportar TG INTERNO"));
     }
   };
 
