@@ -12,6 +12,10 @@ export function downloadBlobResponse(response, fallbackName) {
   URL.revokeObjectURL(url);
 }
 
+function looksLikeHtmlDocument(text) {
+  return /^\s*<!doctype html/i.test(text) || /^\s*<html[\s>]/i.test(text);
+}
+
 export async function getBlobErrorMessage(error, fallback = 'No se pudo completar la descarga') {
   const payload = error?.response?.data;
 
@@ -19,6 +23,9 @@ export async function getBlobErrorMessage(error, fallback = 'No se pudo completa
     try {
       const rawText = await payload.text();
       if (!rawText) return fallback;
+      if (looksLikeHtmlDocument(rawText)) {
+        return 'La descarga no llego a la API: el servidor devolvio la pagina web en lugar del archivo. Revisa la ruta /api o el proxy del backend.';
+      }
 
       try {
         const parsed = JSON.parse(rawText);
@@ -26,11 +33,15 @@ export async function getBlobErrorMessage(error, fallback = 'No se pudo completa
           || parsed?.errores?.[0]?.msg
           || fallback;
       } catch {
-        return rawText;
+        return rawText.length > 300 ? `${rawText.slice(0, 300)}...` : rawText;
       }
     } catch {
       return fallback;
     }
+  }
+
+  if (typeof payload === 'string' && looksLikeHtmlDocument(payload)) {
+    return 'La descarga no llego a la API: el servidor devolvio la pagina web en lugar del archivo. Revisa la ruta /api o el proxy del backend.';
   }
 
   return error?.response?.data?.mensaje
