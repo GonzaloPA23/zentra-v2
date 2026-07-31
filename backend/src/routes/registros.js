@@ -1419,7 +1419,7 @@ function addMovementContributionDelta(deltaMap, movement, multiplier = 1) {
   }
 }
 
-async function applyApprovedEntryStockDelta(
+async function applyApprovedStockDelta(
   executor,
   previousMovements,
   registro,
@@ -1431,21 +1431,29 @@ async function applyApprovedEntryStockDelta(
     addMovementContributionDelta(deltaMap, movement, -1);
   });
 
-  if (shouldApplyApprovedDestinationStock(registro)) {
-    const detalles = Array.isArray(registro.detalles) ? registro.detalles : [];
-    detalles.forEach((detail) => {
-      addStockDelta(
-        deltaMap,
-        {
-          empresa_id: registro.empresa_id,
-          almacen_id: registro.almacen_destino_id,
-          sku_id: detail.sku_id,
-          lote_id: detail.lote_id,
-        },
-        Number(detail.cantidad || 0),
-      );
-    });
+  const detalles = Array.isArray(registro.detalles) ? registro.detalles : [];
+  const nextMovementTypes = [];
+
+  if (!isEntradaRegistro(registro)) {
+    nextMovementTypes.push("SALIDA_TRANSITO");
   }
+  if (shouldApplyApprovedDestinationStock(registro)) {
+    nextMovementTypes.push("INGRESO_APROBADO");
+  }
+
+  detalles.forEach((detail) => {
+    nextMovementTypes.forEach((tipoMovimiento) => {
+      addMovementContributionDelta(deltaMap, {
+        empresa_id: registro.empresa_id,
+        almacen_origen_id: registro.almacen_origen_id,
+        almacen_destino_id: registro.almacen_destino_id,
+        sku_id: detail.sku_id,
+        lote_id: detail.lote_id,
+        cantidad: detail.cantidad,
+        tipo_movimiento: tipoMovimiento,
+      });
+    });
+  });
 
   for (const delta of deltaMap.values()) {
     if (Math.abs(delta.cantidad) < STOCK_EPSILON) continue;
@@ -1456,11 +1464,11 @@ async function applyApprovedEntryStockDelta(
     registro.id,
   ]);
 
-  if (shouldApplyApprovedDestinationStock(registro)) {
-    const detalles = Array.isArray(registro.detalles) ? registro.detalles : [];
-    for (const detail of detalles) {
-      const cantidad = Number(detail.cantidad || 0);
-      if (!cantidad) continue;
+  for (const detail of detalles) {
+    const cantidad = Number(detail.cantidad || 0);
+    if (!cantidad) continue;
+
+    for (const tipoMovimiento of nextMovementTypes) {
       await insertStockMovement(executor, {
         empresa_id: registro.empresa_id,
         registro_id: registro.id,
@@ -1470,7 +1478,7 @@ async function applyApprovedEntryStockDelta(
         sku_id: detail.sku_id,
         lote_id: detail.lote_id,
         cantidad,
-        tipo_movimiento: "INGRESO_APROBADO",
+        tipo_movimiento: tipoMovimiento,
         usuario_id: usuarioId || registro.usuario_id,
       });
     }
@@ -4850,7 +4858,6 @@ router.put(
       if (isApprovedEdit) {
         approvedMovementsBefore = await getRegistroStockMovements(connection, id);
         previousOriginRequirements = buildPreviousOriginRequirements(approvedMovementsBefore);
-        await reverseRecordedStockMovements(connection, id);
       } else {
         previousOriginRequirements = await buildPendingEditOriginRequirements(
           connection,
@@ -4918,9 +4925,12 @@ router.put(
       let approvedMovementsAfter = [];
 
       if (isApprovedEdit) {
-        await applyApprovalStock(connection, updatedRegistro, {
-          previousRequiredByKey: previousOriginRequirements,
-        });
+        await applyApprovedStockDelta(
+          connection,
+          approvedMovementsBefore,
+          updatedRegistro,
+          req.usuario.id,
+        );
         approvedMovementsAfter = await getRegistroStockMovements(connection, id);
         updatedRegistro = await getRegistroById(connection, req, id);
 
