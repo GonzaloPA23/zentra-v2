@@ -3953,6 +3953,7 @@ router.get(
             type: "integer",
           },
           { header: "TIPO MERCADERIA", key: "tipo_mercaderia", width: 20 },
+          { header: "NRO GUIA", key: "nro_guia", width: 18 },
           { header: "SKU", key: "sku", width: 36 },
           { header: "LOTE", key: "lote", width: 18 },
           {
@@ -3962,7 +3963,6 @@ router.get(
             type: "date",
           },
           { header: "CANTIDAD", key: "cantidad", width: 14, type: "number" },
-          { header: "NRO GUIA", key: "nro_guia", width: 18 },
           { header: "ESTADO", key: "estado", width: 16 },
           { header: "REGISTRADO POR", key: "registrado_por", width: 24 },
           { header: "OBSERVACION", key: "observaciones", width: 34 },
