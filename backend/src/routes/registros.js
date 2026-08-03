@@ -27,6 +27,9 @@ const {
   sendExcelWorkbook,
   sendWorkbook,
 } = require("../utils/excel");
+const {
+  expandTgAlmacenesRowsForKardex,
+} = require("../utils/registroExport");
 
 const router = express.Router();
 router.use(authMiddleware, empresaMiddleware);
@@ -3255,7 +3258,10 @@ async function importStockInitialFromWorkbook(
   };
 }
 
-function mapRegistroExportRows(registros = [], { req } = {}) {
+function mapRegistroExportRows(
+  registros = [],
+  { req, expandTgAlmacenesForKardex = false } = {},
+) {
   const rows = [];
 
   registros.forEach((registro) => {
@@ -3273,8 +3279,8 @@ function mapRegistroExportRows(registros = [], { req } = {}) {
             },
           ];
 
-    detalles.forEach((detail, index) => {
-      rows.push({
+    const registroRows = detalles.map((detail, index) => {
+      return {
         id: Number(registro.id || 0),
         fecha: registro.fecha ? new Date(registro.fecha) : null,
         zona: registro.zona || getZonaFromCityName(registro.ciudad_nombre),
@@ -3307,8 +3313,15 @@ function mapRegistroExportRows(registros = [], { req } = {}) {
         registrado_por: registro.registrado_por || "",
         observaciones: registro.observaciones || "",
         foto_guia: buildFotoGuiaCellValue(req, registro.foto_guia),
-      });
+      };
     });
+
+    rows.push(
+      ...expandTgAlmacenesRowsForKardex(registroRows, {
+        enabled: expandTgAlmacenesForKardex,
+        indicator: registro.indicador_nombre,
+      }),
+    );
   });
 
   return rows;
@@ -3968,7 +3981,12 @@ router.get(
           { header: "OBSERVACION", key: "observaciones", width: 34 },
           { header: "FOTO GUIA", key: "foto_guia", width: 64, type: "link" },
         ],
-        rows: mapRegistroExportRows(rows, { req }),
+        rows: mapRegistroExportRows(rows, {
+          req,
+          expandTgAlmacenesForKardex: ["en_transito", "pendiente"].includes(
+            estadoBase,
+          ),
+        }),
       });
     } catch (err) {
       console.error(err);
