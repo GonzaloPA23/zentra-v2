@@ -3983,9 +3983,7 @@ router.get(
         ],
         rows: mapRegistroExportRows(rows, {
           req,
-          expandTgAlmacenesForKardex: ["en_transito", "pendiente"].includes(
-            estadoBase,
-          ),
+          expandTgAlmacenesForKardex: true,
         }),
       });
     } catch (err) {
@@ -4731,7 +4729,10 @@ router.get("/:id/export/excel", async (req, res) => {
         { header: "OBSERVACION", key: "observaciones", width: 34 },
         { header: "FOTO GUIA", key: "foto_guia", width: 64, type: "link" },
       ],
-      rows: mapRegistroExportRows([registro], { req }),
+      rows: mapRegistroExportRows([registro], {
+        req,
+        expandTgAlmacenesForKardex: true,
+      }),
     });
   } catch (err) {
     console.error(err);
