@@ -412,6 +412,31 @@ router.get("/", async (req, res) => {
 router.get(["/export", "/export/xlsx"], async (req, res) => {
   try {
     await ensureTgInternoColumns(pool);
+    const estadoSolicitado = String(req.query.estado || "activos").trim().toLowerCase();
+    const estado = ["todos", "activos", "inactivos"].includes(estadoSolicitado)
+      ? estadoSolicitado
+      : "activos";
+    const skuOrigenIds = [
+      ...new Set(
+        String(req.query.sku_origen_ids || "")
+          .split(",")
+          .map((value) => Number.parseInt(value, 10))
+          .filter((value) => Number.isInteger(value) && value > 0),
+      ),
+    ];
+    const where = ["(? IS NULL OR t.empresa_id = ?)"];
+    const params = [req.empresa_id || null, req.empresa_id || null];
+
+    if (estado === "activos") {
+      where.push("t.activo = 1");
+    } else if (estado === "inactivos") {
+      where.push("t.activo = 0");
+    }
+    if (skuOrigenIds.length) {
+      where.push(`t.sku_origen_id IN (${skuOrigenIds.map(() => "?").join(",")})`);
+      params.push(...skuOrigenIds);
+    }
+
     const [transferencias] = await pool.query(
       `SELECT 
         t.id,
@@ -444,9 +469,9 @@ router.get(["/export", "/export/xlsx"], async (req, res) => {
       LEFT JOIN categorias c2 ON c2.id = d.categoria_destino_id
       LEFT JOIN skus skd ON skd.id = d.sku_destino_id
       LEFT JOIN lotes lod ON lod.id = d.lote_destino_id
-      WHERE (? IS NULL OR t.empresa_id = ?) AND t.activo = 1
+      WHERE ${where.join(" AND ")}
       ORDER BY t.created_at DESC, t.id DESC, d.id ASC`,
-      [req.empresa_id || null, req.empresa_id || null]
+      params
     );
 
     return await sendExcelWorkbook(res, {
