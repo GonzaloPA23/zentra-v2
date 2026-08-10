@@ -318,6 +318,194 @@ async function validateLoteSku(executor, { lote_id, sku_id }) {
   return rows.length > 0;
 }
 
+async function createTransferOrigin(executor, {
+  req,
+  empresaId,
+  almacenId,
+  origen,
+  observaciones,
+  fotoGuia,
+}) {
+  const categoriaOrigenId = parsePositiveInt(origen.categoria_origen_id);
+  const skuOrigenId = parsePositiveInt(origen.sku_origen_id);
+  const loteOrigenId = parsePositiveInt(origen.lote_origen_id);
+  const cantidadOrigen = parsePositiveIntegerQuantity(origen.cantidad_origen);
+  const detalles = Array.isArray(origen.detalles) ? origen.detalles : [];
+
+  if (!categoriaOrigenId || !skuOrigenId || !cantidadOrigen) {
+    throw new Error("Cada origen requiere categoria, SKU y cantidad entera mayor a 0");
+  }
+  if (!detalles.length) {
+    throw new Error("Cada SKU origen debe tener al menos un destino");
+  }
+
+  const sumaDestinos = detalles.reduce(
+    (sum, detalle) => sum + Number(detalle.cantidad || 0),
+    0,
+  );
+  if (sumaDestinos !== cantidadOrigen) {
+    throw new Error("La suma de destinos debe ser igual a la cantidad de cada SKU origen");
+  }
+
+  const skuOrigen = await validateSkuCategory(executor, {
+    sku_id: skuOrigenId,
+    categoria_id: categoriaOrigenId,
+    empresa_id: empresaId,
+  });
+  if (!skuOrigen) {
+    throw new Error("Un SKU origen no pertenece a la categoria seleccionada");
+  }
+  if (!(await validateLoteSku(executor, { lote_id: loteOrigenId, sku_id: skuOrigenId }))) {
+    throw new Error(`El lote origen no pertenece a ${skuOrigen.nombre}`);
+  }
+
+  const stockDisponible = await getCurrentStockAmount(executor, {
+    empresa_id: empresaId,
+    almacen_id: almacenId,
+    sku_id: skuOrigenId,
+    lote_id: loteOrigenId,
+  });
+  if (stockDisponible - cantidadOrigen < -STOCK_EPSILON) {
+    throw new Error(
+      `Stock insuficiente para ${skuOrigen.nombre}. Disponible: ${Math.max(0, stockDisponible)}, salida solicitada: ${cantidadOrigen}`,
+    );
+  }
+
+  const destinosValidados = [];
+  for (const detalle of detalles) {
+    const categoriaDestinoId = parsePositiveInt(detalle.categoria_destino_id);
+    let skuDestinoId = parsePositiveInt(detalle.sku_destino_id);
+    const loteDestinoId = parsePositiveInt(detalle.lote_destino_id);
+    const cantidad = parsePositiveIntegerQuantity(detalle.cantidad);
+    if (!categoriaDestinoId || !cantidad) {
+      throw new Error("Cada destino requiere categoria, SKU y cantidad entera mayor a 0");
+    }
+    if (categoriaDestinoId === categoriaOrigenId) {
+      throw new Error("La categoria destino debe ser distinta a la categoria origen");
+    }
+
+    let skuDestino = skuDestinoId
+      ? await validateSkuCategory(executor, {
+          sku_id: skuDestinoId,
+          categoria_id: categoriaDestinoId,
+          empresa_id: empresaId,
+        })
+      : null;
+    if (!skuDestino) {
+      skuDestino = await findEquivalentSkuByName(executor, {
+        sku_nombre: skuOrigen.nombre,
+        sku_codigo: skuOrigen.codigo,
+        sku_zona: skuOrigen.zona,
+        categoria_id: categoriaDestinoId,
+        empresa_id: empresaId,
+      });
+      skuDestinoId = skuDestino?.id || null;
+    }
+    if (!skuDestino) {
+      throw new Error(`No existe ${skuOrigen.nombre} en una categoria destino seleccionada`);
+    }
+    if (normalizeSkuName(skuDestino.nombre) !== normalizeSkuName(skuOrigen.nombre)) {
+      throw new Error(`El SKU destino debe corresponder a ${skuOrigen.nombre}`);
+    }
+    if (skuOrigen.codigo && String(skuDestino.codigo || "") !== String(skuOrigen.codigo)) {
+      throw new Error("El SKU destino debe tener el mismo codigo que el SKU origen");
+    }
+    if (
+      skuOrigen.zona &&
+      skuDestino.zona &&
+      normalizeSkuName(skuDestino.zona) !== normalizeSkuName(skuOrigen.zona)
+    ) {
+      throw new Error("El SKU destino debe pertenecer a la misma zona que el SKU origen");
+    }
+    if (parseBooleanFlag(skuDestino.tiene_lote) && !loteDestinoId) {
+      throw new Error(`Selecciona un lote destino para ${skuDestino.nombre}`);
+    }
+    if (!(await validateLoteSku(executor, { lote_id: loteDestinoId, sku_id: skuDestinoId }))) {
+      throw new Error(`Un lote destino no pertenece a ${skuDestino.nombre}`);
+    }
+
+    destinosValidados.push({
+      categoriaDestinoId,
+      skuDestinoId,
+      loteDestinoId,
+      cantidad,
+    });
+  }
+
+  const [result] = await executor.query(
+    `INSERT INTO tg_interno_transferencias
+     (empresa_id, almacen_id, categoria_origen_id, sku_origen_id, lote_origen_id,
+      cantidad_origen, usuario_id, observaciones, foto_guia, activo)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    [
+      empresaId,
+      almacenId,
+      categoriaOrigenId,
+      skuOrigenId,
+      loteOrigenId || null,
+      cantidadOrigen,
+      req.usuario.id,
+      observaciones || null,
+      fotoGuia,
+    ],
+  );
+  const transferenciaId = result.insertId;
+
+  for (const destino of destinosValidados) {
+    await executor.query(
+      `INSERT INTO tg_interno_detalle
+       (tg_interno_transferencia_id, categoria_destino_id, sku_destino_id, lote_destino_id, cantidad)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        transferenciaId,
+        destino.categoriaDestinoId,
+        destino.skuDestinoId,
+        destino.loteDestinoId || null,
+        destino.cantidad,
+      ],
+    );
+    await upsertStock(executor, {
+      empresa_id: empresaId,
+      almacen_id: almacenId,
+      sku_id: destino.skuDestinoId,
+      lote_id: destino.loteDestinoId,
+      cantidad: destino.cantidad,
+    });
+    await insertTgStockMovement(executor, {
+      empresa_id: empresaId,
+      tg_interno_transferencia_id: transferenciaId,
+      almacen_origen_id: almacenId,
+      almacen_destino_id: almacenId,
+      sku_id: destino.skuDestinoId,
+      lote_id: destino.loteDestinoId,
+      cantidad: destino.cantidad,
+      tipo_movimiento: "TG_INTERNO_ENTRADA",
+      usuario_id: req.usuario.id,
+    });
+  }
+
+  await upsertStock(executor, {
+    empresa_id: empresaId,
+    almacen_id: almacenId,
+    sku_id: skuOrigenId,
+    lote_id: loteOrigenId,
+    cantidad: cantidadOrigen * -1,
+  });
+  await insertTgStockMovement(executor, {
+    empresa_id: empresaId,
+    tg_interno_transferencia_id: transferenciaId,
+    almacen_origen_id: almacenId,
+    almacen_destino_id: almacenId,
+    sku_id: skuOrigenId,
+    lote_id: loteOrigenId,
+    cantidad: cantidadOrigen,
+    tipo_movimiento: "TG_INTERNO_SALIDA",
+    usuario_id: req.usuario.id,
+  });
+
+  return transferenciaId;
+}
+
 router.get("/stock", async (req, res) => {
   try {
     const almacenId = parsePositiveInt(req.query.almacen_id);
@@ -412,31 +600,6 @@ router.get("/", async (req, res) => {
 router.get(["/export", "/export/xlsx"], async (req, res) => {
   try {
     await ensureTgInternoColumns(pool);
-    const estadoSolicitado = String(req.query.estado || "activos").trim().toLowerCase();
-    const estado = ["todos", "activos", "inactivos"].includes(estadoSolicitado)
-      ? estadoSolicitado
-      : "activos";
-    const skuOrigenIds = [
-      ...new Set(
-        String(req.query.sku_origen_ids || "")
-          .split(",")
-          .map((value) => Number.parseInt(value, 10))
-          .filter((value) => Number.isInteger(value) && value > 0),
-      ),
-    ];
-    const where = ["(? IS NULL OR t.empresa_id = ?)"];
-    const params = [req.empresa_id || null, req.empresa_id || null];
-
-    if (estado === "activos") {
-      where.push("t.activo = 1");
-    } else if (estado === "inactivos") {
-      where.push("t.activo = 0");
-    }
-    if (skuOrigenIds.length) {
-      where.push(`t.sku_origen_id IN (${skuOrigenIds.map(() => "?").join(",")})`);
-      params.push(...skuOrigenIds);
-    }
-
     const [transferencias] = await pool.query(
       `SELECT 
         t.id,
@@ -469,9 +632,9 @@ router.get(["/export", "/export/xlsx"], async (req, res) => {
       LEFT JOIN categorias c2 ON c2.id = d.categoria_destino_id
       LEFT JOIN skus skd ON skd.id = d.sku_destino_id
       LEFT JOIN lotes lod ON lod.id = d.lote_destino_id
-      WHERE ${where.join(" AND ")}
+      WHERE (? IS NULL OR t.empresa_id = ?) AND t.activo = 1
       ORDER BY t.created_at DESC, t.id DESC, d.id ASC`,
-      params
+      [req.empresa_id || null, req.empresa_id || null]
     );
 
     return await sendExcelWorkbook(res, {
@@ -582,6 +745,90 @@ router.get("/:id", async (req, res) => {
   } catch (error) {
     console.error("[TG INTERNO GET DETALLE]", error);
     res.status(500).json({ mensaje: "Error al obtener transferencia" });
+  }
+});
+
+// POST - Crear varias transferencias de origen en una sola operacion atomica
+router.post("/multiple", upload.single("foto_guia"), async (req, res) => {
+  const uploadedFileName = req.file?.filename || null;
+  let origenes = [];
+  try {
+    origenes = parseJsonArray(req.body.origenes);
+  } catch {
+    if (uploadedFileName) cleanupUploadedFile(uploadedFileName);
+    return res.status(400).json({ mensaje: "Los SKU origen no tienen un formato valido" });
+  }
+
+  if (!uploadedFileName) {
+    return res.status(400).json({ mensaje: "Foto guia requerida" });
+  }
+  if (!parsePositiveInt(req.body.almacen_id)) {
+    cleanupUploadedFile(uploadedFileName);
+    return res.status(400).json({ mensaje: "Selecciona un almacen" });
+  }
+  if (!origenes.length) {
+    cleanupUploadedFile(uploadedFileName);
+    return res.status(400).json({ mensaje: "Agrega al menos un SKU origen" });
+  }
+
+  const sourceKeys = origenes.map((origen) => {
+    const skuId = parsePositiveInt(origen.sku_origen_id);
+    const loteId = parsePositiveInt(origen.lote_origen_id) || "sin-lote";
+    return `${skuId || ""}|${loteId}`;
+  });
+  if (sourceKeys.some((key) => key.startsWith("|")) || new Set(sourceKeys).size !== sourceKeys.length) {
+    cleanupUploadedFile(uploadedFileName);
+    return res.status(400).json({ mensaje: "No puedes repetir el mismo SKU y lote de origen" });
+  }
+
+  const uploadedFileNames = [uploadedFileName];
+  let connection;
+  try {
+    const uploadDir = path.resolve(process.env.UPLOAD_PATH || "./uploads");
+    const parsedFileName = path.parse(uploadedFileName);
+    for (let index = 1; index < origenes.length; index += 1) {
+      const copyName = `${parsedFileName.name}-${index + 1}${parsedFileName.ext}`;
+      fs.copyFileSync(
+        path.join(uploadDir, uploadedFileName),
+        path.join(uploadDir, copyName),
+      );
+      uploadedFileNames.push(copyName);
+    }
+
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await ensureTgInternoColumns(connection);
+    await ensureTgInternoStockSchema(connection);
+
+    const almacenId = parsePositiveInt(req.body.almacen_id);
+    const empresaId = await resolveEmpresaIdForWarehouse(connection, req, almacenId);
+    if (!empresaId) throw new Error("No se pudo resolver la empresa del almacen seleccionado");
+
+    const ids = [];
+    for (let index = 0; index < origenes.length; index += 1) {
+      const origen = origenes[index];
+      ids.push(await createTransferOrigin(connection, {
+        req,
+        empresaId,
+        almacenId,
+        origen,
+        observaciones: req.body.observaciones,
+        fotoGuia: uploadedFileNames[index],
+      }));
+    }
+
+    await connection.commit();
+    return res.status(201).json({
+      mensaje: `${ids.length} transferencia${ids.length === 1 ? "" : "s"} creada${ids.length === 1 ? "" : "s"} exitosamente`,
+      ids,
+    });
+  } catch (error) {
+    if (connection) await connection.rollback();
+    uploadedFileNames.forEach(cleanupUploadedFile);
+    console.error("[TG INTERNO MULTIPLE POST]", error);
+    return res.status(400).json({ mensaje: error.message || "Error al crear transferencias" });
+  } finally {
+    if (connection) connection.release();
   }
 });
 

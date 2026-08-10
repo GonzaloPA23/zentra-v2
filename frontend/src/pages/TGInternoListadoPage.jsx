@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Download, ArrowLeft, Edit, Trash2 } from "lucide-react";
@@ -6,7 +6,6 @@ import { toast } from "react-toastify";
 import api from "../utils/api";
 import { downloadBlobResponse, getBlobErrorMessage } from "../utils/download";
 import DataTable from "../components/DataTable";
-import MultiSelectFilter from "../components/MultiSelectFilter";
 import { useAuth } from "../context/AuthContext";
 
 export default function TGInternoListadoPage() {
@@ -14,7 +13,6 @@ export default function TGInternoListadoPage() {
   const queryClient = useQueryClient();
   const { hasRole } = useAuth();
   const [filtro, setFiltro] = useState("activos");
-  const [skuOrigenIds, setSkuOrigenIds] = useState([]);
   const canManage = hasRole("superadmin", "admin");
 
   const { data: transferencias = [], isLoading } = useQuery({
@@ -35,37 +33,10 @@ export default function TGInternoListadoPage() {
   const getAlmacenNombre = (id) => almacenes.find((a) => a.id === Number(id))?.nombre || "N/A";
   const getCategoriaNombre = (id) => categorias.find((c) => c.id === Number(id))?.nombre || "N/A";
 
-  const skuOptions = useMemo(() => {
-    const optionsById = new Map();
-    transferencias.forEach((transferencia) => {
-      if (!transferencia.sku_origen_id) return;
-      const value = String(transferencia.sku_origen_id);
-      if (optionsById.has(value)) return;
-      const codigo = transferencia.sku_origen_codigo
-        ? `${transferencia.sku_origen_codigo} - `
-        : "";
-      optionsById.set(value, {
-        value,
-        label: `${codigo}${transferencia.sku_origen_nombre || "SKU sin nombre"}`,
-        searchText: `${transferencia.sku_origen_codigo || ""} ${
-          transferencia.sku_origen_nombre || ""
-        }`,
-      });
-    });
-    return [...optionsById.values()].sort((a, b) =>
-      a.label.localeCompare(b.label, "es", { numeric: true }),
-    );
-  }, [transferencias]);
-
-  const filtradas = transferencias.filter((transferencia) => {
-    const matchesEstado =
-      filtro === "todos" ||
-      (filtro === "activos" && transferencia.activo) ||
-      (filtro === "inactivos" && !transferencia.activo);
-    const matchesSku =
-      skuOrigenIds.length === 0 ||
-      skuOrigenIds.includes(String(transferencia.sku_origen_id));
-    return matchesEstado && matchesSku;
+  const filtradas = transferencias.filter((t) => {
+    if (filtro === "activos") return t.activo;
+    if (filtro === "inactivos") return !t.activo;
+    return true;
   });
 
   const columns = [
@@ -84,7 +55,6 @@ export default function TGInternoListadoPage() {
       header: "SKU Origen",
       value: (row) => row.sku_origen_nombre || "",
       render: (row) => row.sku_origen_nombre || "N/A",
-      filterable: false,
     },
     { header: "Cantidad", accessor: "cantidad_origen" },
     {
@@ -168,11 +138,7 @@ export default function TGInternoListadoPage() {
 
   const handleExportar = async () => {
     try {
-      const params = new URLSearchParams({ estado: filtro });
-      if (skuOrigenIds.length) {
-        params.set("sku_origen_ids", skuOrigenIds.join(","));
-      }
-      const response = await api.get(`/tg-interno/export?${params.toString()}`, {
+      const response = await api.get("/tg-interno/export", {
         responseType: "blob",
         timeout: 120_000,
       });
@@ -225,7 +191,7 @@ export default function TGInternoListadoPage() {
 
       {/* Filtros */}
       <div className="card">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex gap-4">
           <button
             onClick={() => setFiltro("todos")}
             className={`px-4 py-2 rounded text-sm font-medium ${
@@ -256,29 +222,6 @@ export default function TGInternoListadoPage() {
           >
             Inactivos
           </button>
-        </div>
-        <div className="mt-5 max-w-2xl border-t border-gray-100 pt-5">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-gray-800">SKU origen</p>
-              <p className="text-xs text-gray-500">
-                Puedes seleccionar uno o varios SKU.
-              </p>
-            </div>
-            {skuOrigenIds.length > 0 && (
-              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                {skuOrigenIds.length} seleccionado{skuOrigenIds.length === 1 ? "" : "s"}
-              </span>
-            )}
-          </div>
-          <MultiSelectFilter
-            options={skuOptions}
-            values={skuOrigenIds}
-            onChange={setSkuOrigenIds}
-            placeholder="Seleccionar SKU origen..."
-            searchPlaceholder="Buscar por código o nombre..."
-            emptyText="No hay SKU disponibles"
-          />
         </div>
       </div>
 

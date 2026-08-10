@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { AlertCircle, ArrowLeft, Plus, Save, Trash2, Upload } from "lucide-react";
 import api from "../utils/api";
 import SearchableSelect from "../components/SearchableSelect";
+import TGInternoMultiplePage from "./TGInternoMultiplePage";
 
 function buildSearchOptions(rows = [], labelBuilder) {
   return rows.map((row) => ({
@@ -51,6 +52,11 @@ function isEquivalentSku(sourceSku, targetSku) {
 }
 
 export default function TGInternoPage() {
+  const { id } = useParams();
+  return id ? <TGInternoEditPage /> : <TGInternoMultiplePage />;
+}
+
+function TGInternoEditPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
