@@ -4002,6 +4002,8 @@ router.get(
     try {
       const fechaIni = String(req.query.fecha_ini || "").trim();
       const fechaFin = String(req.query.fecha_fin || "").trim();
+      const fechaCorte = String(req.query.fecha_corte || "").trim();
+      const fechaFinEfectiva = fechaCorte || fechaFin;
       const categoriaId = parsePositiveInt(req.query.categoria_id);
       const tipoMercaderiaId = parsePositiveInt(req.query.tipo_mercaderia_id);
       const requestedWarehouseId = parsePositiveInt(req.query.almacen_id);
@@ -4014,6 +4016,9 @@ router.get(
       }
       if (fechaFin && !isValidDateInput(fechaFin)) {
         return sendBadRequest(res, "Fecha final invalida");
+      }
+      if (fechaCorte && !isValidDateInput(fechaCorte)) {
+        return sendBadRequest(res, "Fecha de corte invalida");
       }
 
       let query = `SELECT
@@ -4097,9 +4102,9 @@ router.get(
         query += " AND lo.fecha_vencimiento <= ?";
         params.push(req.query.vencimiento_hasta);
       }
-      if (fechaFin) {
+      if (fechaFinEfectiva) {
         query += " AND DATE(COALESCE(r.fecha, sm.created_at)) <= ?";
-        params.push(fechaFin);
+        params.push(fechaFinEfectiva);
       }
 
       const scopedWarehouseIds = ["almacenero", "supervisor"].includes(
@@ -4125,9 +4130,9 @@ router.get(
         stockInitialQuery += " AND empresa_id=?";
         stockInitialParams.push(req.empresa_id);
       }
-      if (fechaFin) {
+      if (fechaFinEfectiva) {
         stockInitialQuery += " AND DATE(created_at) <= ?";
-        stockInitialParams.push(fechaFin);
+        stockInitialParams.push(fechaFinEfectiva);
       }
       stockInitialQuery += " ORDER BY created_at, id";
 
@@ -4168,12 +4173,13 @@ router.get(
       );
 
       const { rows, movementLabels } = buildStockReportRows(movements, {
-        fechaIni,
-        fechaFin,
+        fechaIni: fechaCorte ? "" : fechaIni,
+        fechaFin: fechaFinEfectiva,
         warehouseScopeIds: effectiveWarehouseScopeIds,
       });
 
       const columns = [
+        { header: "FECHA", key: "fecha", width: 14, type: "date" },
         { header: "ZONA", key: "zona", width: 14 },
         { header: "ALMACEN", key: "almacen", width: 24 },
         { header: "CATEGORIA", key: "categoria", width: 18 },
@@ -4208,11 +4214,16 @@ router.get(
       ];
 
       await sendExcelWorkbook(res, {
-        fileName: `zentra_stock_sku_lote_${Date.now()}`,
+        fileName: `zentra_stock_${fechaFinEfectiva || "actual"}_${Date.now()}`,
         sheetName: "Stock SKU Lote",
         columns,
         rows: rows.map((row) => {
-          const exportRow = { ...row };
+          const exportRow = {
+            ...row,
+            fecha: fechaFinEfectiva
+              ? new Date(`${fechaFinEfectiva}T00:00:00`)
+              : new Date(),
+          };
           movementLabels.forEach((label) => {
             exportRow[label] = toStockReportInteger(row[label]);
           });

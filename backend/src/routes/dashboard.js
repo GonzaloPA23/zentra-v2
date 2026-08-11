@@ -35,6 +35,37 @@ function toStockInteger(value) {
   return Math.trunc(Number(value || 0));
 }
 
+function isValidDateInput(value) {
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
+}
+
+function getDateInputValue(value = new Date()) {
+  const raw = String(value || '').trim();
+  const rawMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (rawMatch) return `${rawMatch[1]}-${rawMatch[2]}-${rawMatch[3]}`;
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
+
 function getMovementEffects(tipoMovimiento = 'APROBACION') {
   return STOCK_MOVEMENT_EFFECTS[tipoMovimiento] || STOCK_MOVEMENT_EFFECTS.APROBACION;
 }
@@ -108,6 +139,7 @@ function buildDashboardStockRows(movements = [], scopedWarehouseIds = []) {
 
       if (!rowsByKey.has(key)) {
         rowsByKey.set(key, {
+          empresa_id: movement.empresa_id ? Number(movement.empresa_id) : null,
           almacen_id: Number(entry.almacen_id),
           almacen: entry.almacen,
           zona: entry.zona,
@@ -193,6 +225,7 @@ function buildStockInitialMovements(auditRows = [], skuReferenceMap = new Map())
     if (!detail || !detail.almacen_id || !detail.sku_id || !detail.cantidad) return null;
     return {
       id: `audit-${auditRow.id}`,
+      empresa_id: auditRow.empresa_id ? Number(auditRow.empresa_id) : null,
       tipo_movimiento: 'STOCK_INITIAL',
       tipo_accion: 'ENTRADA',
       cantidad: Number(detail.cantidad || 0),
@@ -214,6 +247,118 @@ function buildStockInitialMovements(auditRows = [], skuReferenceMap = new Map())
       lote_fecha_vencimiento: detail.fecha_vencimiento || null,
     };
   }).filter(Boolean);
+}
+
+async function loadDashboardNotificationRules(empresaId = null) {
+  if (!(await hasConfigNotificacionesTable())) return [];
+
+  let query = `SELECT
+      cn.empresa_id,
+      cn.tipo_mercaderia_id,
+      tm.categoria_id,
+      tm.nombre AS tipo_mercaderia_nombre,
+      cn.excluir_de_stock_critico,
+      cn.excluir_de_stock_bajo,
+      cn.excluir_de_vencimientos
+    FROM config_notificaciones cn
+    LEFT JOIN tipos_mercaderia tm ON tm.id = cn.tipo_mercaderia_id
+    WHERE cn.activo = 1`;
+  const params = [];
+  if (empresaId) {
+    query += ' AND cn.empresa_id = ?';
+    params.push(empresaId);
+  }
+
+  const [rows] = await pool.query(query, params);
+  return rows;
+}
+
+function findDashboardNotificationRule(row, rules = []) {
+  const rowTypeName = normalizeDashboardLabel(row.tipo_mercaderia);
+  return rules.find((rule) => {
+    if (row.empresa_id && Number(rule.empresa_id) !== Number(row.empresa_id)) return false;
+    if (Number(rule.tipo_mercaderia_id) === Number(row.tipo_mercaderia_id)) return true;
+    return Number(rule.categoria_id) === Number(row.categoria_id)
+      && normalizeDashboardLabel(rule.tipo_mercaderia_nombre) === rowTypeName;
+  }) || null;
+}
+
+function buildDashboardStockAlerts(rows = [], rules = [], referenceDate = '') {
+  const reference = isValidDateInput(referenceDate)
+    ? referenceDate
+    : getDateInputValue(new Date());
+  const referenceTime = new Date(`${reference}T00:00:00Z`).getTime();
+  const nextWeekTime = referenceTime + (7 * 86400000);
+  const stockByWarehouseSku = new Map();
+  const vencidos = [];
+  const vencimientosProximos = [];
+
+  rows.forEach((row) => {
+    const stock = toStockInteger(row.stock_final);
+    if (stock <= 0) return;
+
+    const rule = findDashboardNotificationRule(row, rules);
+    const aggregateKey = `${row.almacen_id}|${row.sku_id}`;
+    if (!stockByWarehouseSku.has(aggregateKey)) {
+      stockByWarehouseSku.set(aggregateKey, {
+        almacen_id: row.almacen_id,
+        sku_id: row.sku_id,
+        almacen: row.almacen,
+        sku: row.sku,
+        categoria: row.categoria,
+        tipo_mercaderia: row.tipo_mercaderia,
+        cantidad: 0,
+        excluir_de_stock_critico: false,
+        excluir_de_stock_bajo: false,
+      });
+    }
+    const aggregate = stockByWarehouseSku.get(aggregateKey);
+    aggregate.cantidad += stock;
+    aggregate.excluir_de_stock_critico ||= Boolean(rule?.excluir_de_stock_critico);
+    aggregate.excluir_de_stock_bajo ||= Boolean(rule?.excluir_de_stock_bajo);
+
+    if (!row.fecha_vencimiento || rule?.excluir_de_vencimientos) return;
+    const expirationDate = getDateInputValue(row.fecha_vencimiento);
+    if (!isValidDateInput(expirationDate)) return;
+    const expirationTime = new Date(`${expirationDate}T00:00:00Z`).getTime();
+    const alertRow = {
+      id: `${row.almacen_id}-${row.sku_id}-${row.lote_id || 'sin-lote'}`,
+      sku: row.sku,
+      fecha_vencimiento: expirationDate,
+      cantidad: stock,
+      almacen: row.almacen,
+      dias_restantes: Math.ceil((expirationTime - referenceTime) / 86400000),
+    };
+    if (expirationTime < referenceTime) {
+      vencidos.push(alertRow);
+    } else if (expirationTime <= nextWeekTime) {
+      vencimientosProximos.push(alertRow);
+    }
+  });
+
+  const stockCritico = [];
+  const stockBajo = [];
+  [...stockByWarehouseSku.values()]
+    .sort((left, right) => left.cantidad - right.cantidad || String(left.sku).localeCompare(String(right.sku)))
+    .slice(0, ALERT_FETCH_LIMIT)
+    .forEach((item) => {
+      if (item.cantidad <= LOW_STOCK_CRITICAL_THRESHOLD) {
+        if (!item.excluir_de_stock_critico) stockCritico.push(item);
+      } else if (item.cantidad <= LOW_STOCK_WARNING_THRESHOLD && !item.excluir_de_stock_bajo) {
+        stockBajo.push(item);
+      }
+    });
+
+  return {
+    vencidos: vencidos.sort((a, b) => String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento))).slice(0, ALERT_FETCH_LIMIT),
+    vencimientos_proximos: vencimientosProximos.sort((a, b) => String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento))).slice(0, ALERT_FETCH_LIMIT),
+    stock_critico: stockCritico,
+    stock_bajo: stockBajo,
+    stock_limites: {
+      critico: LOW_STOCK_CRITICAL_THRESHOLD,
+      bajo: LOW_STOCK_WARNING_THRESHOLD,
+    },
+  };
 }
 
 function applyDashboardStockFilters(rows, filters = {}) {
@@ -273,6 +418,7 @@ router.get('/resumen', async (req, res) => {
   try {
     const eid = req.empresa_id;
     const {
+      fecha_corte,
       almacen_id,
       zona,
       categoria_id,
@@ -282,6 +428,9 @@ router.get('/resumen', async (req, res) => {
       vencimiento_desde,
       vencimiento_hasta,
     } = req.query;
+    if (fecha_corte && !isValidDateInput(fecha_corte)) {
+      return res.status(400).json({ ok: false, mensaje: 'Fecha de corte invalida' });
+    }
     const hasNotificationConfig = await hasConfigNotificacionesTable();
     const configuredTypeNameExpr = normalizeSqlText('cn_tm.nombre');
     const skuTypeNameExpr = normalizeSqlText('tm.nombre');
@@ -420,6 +569,10 @@ router.get('/resumen', async (req, res) => {
       registroFilters.push('r.fecha_vencimiento <= ?');
       registroFilterParams.push(vencimiento_hasta);
     }
+    if (fecha_corte) {
+      registroFilters.push('DATE(r.fecha) <= ?');
+      registroFilterParams.push(fecha_corte);
+    }
 
     const registroFilterClause = registroFilters.length ? ` AND ${registroFilters.join(' AND ')}` : '';
     const whereRegistros = eid
@@ -433,10 +586,10 @@ router.get('/resumen', async (req, res) => {
         SUM(CASE WHEN r.estado='pendiente' THEN 1 ELSE 0 END) AS pendientes,
         SUM(CASE WHEN r.estado='en_transito' THEN 1 ELSE 0 END) AS en_transito,
         SUM(CASE WHEN r.estado='aprobado' THEN 1 ELSE 0 END) AS aprobados,
-        SUM(CASE WHEN DATE(r.created_at)=CURDATE() THEN 1 ELSE 0 END) AS hoy
+        SUM(CASE WHEN DATE(r.fecha)=${fecha_corte ? '?' : 'CURDATE()'} THEN 1 ELSE 0 END) AS hoy
        FROM registros r
        ${whereRegistros}`,
-      scopedParams
+      fecha_corte ? [fecha_corte, ...scopedParams] : scopedParams
     );
 
     const [por_categoria] = await pool.query(
@@ -465,10 +618,10 @@ router.get('/resumen', async (req, res) => {
                 WHERE rd.registro_id = r.id
               ), r.cantidad, 0)) AS cantidad
        FROM registros r
-       ${whereRegistros} AND r.fecha >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+       ${whereRegistros} AND r.fecha >= DATE_SUB(${fecha_corte ? '?' : 'CURDATE()'}, INTERVAL 6 MONTH)
        GROUP BY mes
        ORDER BY mes`,
-      scopedParams
+      fecha_corte ? [...scopedParams, fecha_corte] : scopedParams
     );
 
     const [transitoRaw] = await pool.query(
@@ -663,6 +816,7 @@ router.get('/stock-table', async (req, res) => {
   try {
     const eid = req.empresa_id;
     const {
+      fecha_corte,
       almacen_id,
       zona,
       categoria_id,
@@ -673,10 +827,16 @@ router.get('/stock-table', async (req, res) => {
       vencimiento_hasta,
     } = req.query;
 
+    if (fecha_corte && !isValidDateInput(fecha_corte)) {
+      return res.status(400).json({ ok: false, mensaje: 'Fecha de corte invalida' });
+    }
+
     const scopedStockIds = await getDashboardWarehouseScope(req);
     
     let movementsQuery = `SELECT
         sm.id,
+        sm.empresa_id,
+        COALESCE(r.fecha, sm.created_at) AS movimiento_fecha,
         sm.tipo_movimiento,
         sm.cantidad,
         sm.almacen_origen_id,
@@ -718,16 +878,24 @@ router.get('/stock-table', async (req, res) => {
       movementsQuery += ' AND sm.empresa_id=?';
       movementParams.push(eid);
     }
+    if (fecha_corte) {
+      movementsQuery += ' AND DATE(COALESCE(r.fecha, sm.created_at)) <= ?';
+      movementParams.push(fecha_corte);
+    }
 
     const [stockMovements] = await pool.query(movementsQuery, movementParams);
 
-    let auditQuery = `SELECT id, created_at, detalle
+    let auditQuery = `SELECT id, empresa_id, created_at, detalle
                       FROM audit_log
                       WHERE accion='STOCK_INITIAL' AND tabla='stock_almacen'`;
     const auditParams = [];
     if (eid) {
       auditQuery += ' AND empresa_id=?';
       auditParams.push(eid);
+    }
+    if (fecha_corte) {
+      auditQuery += ' AND DATE(created_at) <= ?';
+      auditParams.push(fecha_corte);
     }
     const [auditRows] = await pool.query(auditQuery, auditParams);
     const skuReferenceMap = await loadSkuReferenceMap(pool, eid);
@@ -746,6 +914,12 @@ router.get('/stock-table', async (req, res) => {
       vencimiento_desde,
       vencimiento_hasta,
     });
+    const notificationRules = await loadDashboardNotificationRules(eid);
+    const stockAlerts = buildDashboardStockAlerts(
+      normalizedRows,
+      notificationRules,
+      fecha_corte,
+    );
 
     const uniqueBy = (key, labelKey) => Array.from(
       filterRows.reduce((map, row) => {
@@ -815,7 +989,9 @@ router.get('/stock-table', async (req, res) => {
     res.json({
       ok: true,
       datos: {
+        fecha_corte: fecha_corte || getDateInputValue(new Date()),
         rows: normalizedRows,
+        alertas: stockAlerts,
         filtros: {
           almacenes: uniqueWarehouses(),
           zonas: ['LIMA', 'PROVINCIA'].filter((zonaNombre) => filterRows.some((row) => row.zona === zonaNombre)),

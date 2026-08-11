@@ -32,11 +32,12 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { getSafeDate } from '../utils/date';
+import { formatSafeDate, getPeruTodayDateInputValue, getSafeDate } from '../utils/date';
 import StockTableMatrix from '../components/StockTableMatrix';
 
 const COLORS = ['#2563eb', '#0891b2', '#16a34a', '#f59e0b', '#db2777', '#7c3aed', '#475569'];
 const EMPTY_FILTERS = {
+  fecha_corte: getPeruTodayDateInputValue(),
   almacen_id: '',
   zona: '',
   categoria_id: '',
@@ -89,7 +90,19 @@ function DashboardFilters({ filters, options, onChange, onClear }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <label className="block">
+          <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500">
+            <CalendarDays size={13} /> Stock al día
+          </span>
+          <input
+            type="date"
+            className="input"
+            value={filters.fecha_corte}
+            max={getPeruTodayDateInputValue()}
+            onChange={(e) => onChange('fecha_corte', e.target.value)}
+          />
+        </label>
         <label className="block">
           <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase text-gray-500">
             <MapPin size={13} /> Zona
@@ -183,7 +196,7 @@ function DashboardFilters({ filters, options, onChange, onClear }) {
 
 function AlertRow({ item, tipo }) {
   const fechaVencimiento = getSafeDate(item.fecha_vencimiento);
-  const dias = fechaVencimiento ? Math.ceil((fechaVencimiento - new Date()) / 86400000) : null;
+  const dias = item.dias_restantes ?? (fechaVencimiento ? Math.ceil((fechaVencimiento - new Date()) / 86400000) : null);
 
   return (
     <div className={`flex items-center gap-3 rounded-lg p-3 text-sm ${tipo === 'vencido' ? 'bg-red-50' : 'bg-yellow-50'}`}>
@@ -243,12 +256,19 @@ export default function DashboardPage() {
     cantidad: Math.trunc(Number(m.cantidad || 0)),
   }));
   const porCategoria = Array.isArray(data?.por_categoria) ? data.por_categoria : [];
+  const isHistoricalCutoff = Boolean(
+    filters.fecha_corte
+    && filters.fecha_corte !== getPeruTodayDateInputValue(),
+  );
+  const stockAlerts = isHistoricalCutoff
+    ? (stockData?.alertas ?? {})
+    : (data?.alertas ?? stockData?.alertas ?? {});
   const alertas = {
-    vencidos: Array.isArray(data?.alertas?.vencidos) ? data.alertas.vencidos : [],
-    vencimientos_proximos: Array.isArray(data?.alertas?.vencimientos_proximos) ? data.alertas.vencimientos_proximos : [],
-    stock_critico: Array.isArray(data?.alertas?.stock_critico) ? data.alertas.stock_critico : [],
-    stock_bajo: Array.isArray(data?.alertas?.stock_bajo) ? data.alertas.stock_bajo : [],
-    stock_limites: data?.alertas?.stock_limites ?? { critico: 100, bajo: 200 },
+    vencidos: Array.isArray(stockAlerts.vencidos) ? stockAlerts.vencidos : [],
+    vencimientos_proximos: Array.isArray(stockAlerts.vencimientos_proximos) ? stockAlerts.vencimientos_proximos : [],
+    stock_critico: Array.isArray(stockAlerts.stock_critico) ? stockAlerts.stock_critico : [],
+    stock_bajo: Array.isArray(stockAlerts.stock_bajo) ? stockAlerts.stock_bajo : [],
+    stock_limites: stockAlerts.stock_limites ?? { critico: 100, bajo: 200 },
   };
 
   const stockRows = Array.isArray(stockData?.rows) ? stockData.rows : [];
@@ -278,11 +298,23 @@ export default function DashboardPage() {
         <StatCard icon={ClipboardList} label="Total registros" value={formatInt(t.total_registros)} color="bg-primary-500" />
         <StatCard icon={Clock} label="Pendientes" value={formatInt(t.pendientes)} color="bg-yellow-500" />
         <StatCard icon={TrendingUp} label="En transito" value={formatInt(t.en_transito)} color="bg-blue-500" />
-        <StatCard icon={CheckCircle} label="Aprobados" value={formatInt(t.aprobados)} color="bg-green-500" sub={`${formatInt(t.hoy)} hoy`} />
+        <StatCard
+          icon={CheckCircle}
+          label="Aprobados"
+          value={formatInt(t.aprobados)}
+          color="bg-green-500"
+          sub={`${formatInt(t.hoy)} el ${formatSafeDate(filters.fecha_corte)}`}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={Boxes} label="Stock final" value={formatInt(stockTotal)} color="bg-slate-700" />
+        <StatCard
+          icon={Boxes}
+          label="Stock final"
+          value={formatInt(stockTotal)}
+          color="bg-slate-700"
+          sub={`Al cierre del ${formatSafeDate(filters.fecha_corte)}`}
+        />
         <StatCard icon={Search} label="SKUs con stock" value={formatInt(skuCount)} color="bg-indigo-500" />
         <StatCard icon={Warehouse} label="Almacenes" value={formatInt(warehouseCount)} color="bg-cyan-600" />
         <StatCard icon={Layers} label="Lotes visibles" value={formatInt(lotCount)} color="bg-emerald-600" />

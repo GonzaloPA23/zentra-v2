@@ -25,7 +25,7 @@ import ExcelBulkUploadModal from "../components/ExcelBulkUploadModal";
 import Modal from "../components/Modal";
 import SearchableSelect from "../components/SearchableSelect";
 import SortableFilterHeader from "../components/SortableFilterHeader";
-import { formatSafeDate, toSafeDateInputValue } from "../utils/date";
+import { formatSafeDate, getPeruTodayDateInputValue, toSafeDateInputValue } from "../utils/date";
 import { downloadBlobResponse, getBlobErrorMessage } from "../utils/download";
 
 const ESTADOS = {
@@ -72,6 +72,36 @@ const STOCK_INICIAL_DEFAULTS = {
 };
 
 const NUEVO_LOTE_OPTION = "__nuevo__";
+
+function StockReportDateModal({ open, onClose, date, onDateChange, onDownload, loading }) {
+  return (
+    <Modal open={open} onClose={onClose} title="Reporte de stock por fecha" size="sm">
+      <div className="space-y-4">
+        <div>
+          <label className="label">Fecha de corte <span className="text-red-500">*</span></label>
+          <input
+            type="date"
+            className="input"
+            value={date}
+            max={getPeruTodayDateInputValue()}
+            onChange={(event) => onDateChange(event.target.value)}
+          />
+          <p className="mt-2 text-xs text-gray-500">
+            El stock final incluirá todos los movimientos registrados hasta finalizar este día.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={loading}>
+            Cancelar
+          </button>
+          <button type="button" className="btn-primary" onClick={onDownload} disabled={loading || !date}>
+            {loading ? <><Loader2 size={15} className="animate-spin" /> Generando...</> : <><Download size={15} /> Descargar reporte</>}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 function buildSearchOptions(rows = [], labelBuilder, searchBuilder) {
   return rows.map((row) => ({
@@ -768,6 +798,9 @@ export default function RegistrosPageV2() {
   const [deleting, setDeleting] = useState(null);
   const [stockInicialOpen, setStockInicialOpen] = useState(false);
   const [stockInicialBulkOpen, setStockInicialBulkOpen] = useState(false);
+  const [stockReportOpen, setStockReportOpen] = useState(false);
+  const [stockReportDate, setStockReportDate] = useState(getPeruTodayDateInputValue());
+  const [stockReportLoading, setStockReportLoading] = useState(false);
   const tableScrollRef = useRef(null);
   const tableDragRef = useRef(null);
 
@@ -831,6 +864,38 @@ export default function RegistrosPageV2() {
       await downloadBlobResponse(response, fallbackName);
     } catch (error) {
       toast.error(await getBlobErrorMessage(error));
+    }
+  };
+
+  const handleStockReportExport = async () => {
+    if (!stockReportDate) {
+      toast.error("Selecciona la fecha del reporte");
+      return;
+    }
+
+    setStockReportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && !["fecha_ini", "fecha_fin", "page"].includes(key)) {
+          params.set(key, value);
+        }
+      });
+      params.set("fecha_corte", stockReportDate);
+
+      const response = await api.get(
+        `/registros/export/stock/excel?${params.toString()}`,
+        { responseType: "blob", timeout: 120_000 },
+      );
+      await downloadBlobResponse(
+        response,
+        `zentra_stock_${stockReportDate}.xlsx`,
+      );
+      setStockReportOpen(false);
+    } catch (error) {
+      toast.error(await getBlobErrorMessage(error));
+    } finally {
+      setStockReportLoading(false);
     }
   };
 
@@ -910,12 +975,7 @@ export default function RegistrosPageV2() {
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  handleExport(
-                    "/registros/export/stock/excel",
-                    `zentra_stock_sku_lote_${Date.now()}.xlsx`,
-                  )
-                }
+                onClick={() => setStockReportOpen(true)}
                 className="btn-secondary btn-sm"
               >
                 <FileSpreadsheet size={14} /> Reporte stock
@@ -1196,6 +1256,15 @@ export default function RegistrosPageV2() {
           </div>
         </div>
       )}
+
+      <StockReportDateModal
+        open={stockReportOpen}
+        onClose={() => setStockReportOpen(false)}
+        date={stockReportDate}
+        onDateChange={setStockReportDate}
+        onDownload={handleStockReportExport}
+        loading={stockReportLoading}
+      />
 
       <StockInicialModal
         open={stockInicialOpen}
