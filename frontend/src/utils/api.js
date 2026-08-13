@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { normalizeWarehouseNamesInData } from './warehouseName';
 
 const api = axios.create({
   baseURL: '/api',
@@ -24,7 +25,16 @@ api.interceptors.request.use((config) => {
 
 // Interceptor response: maneja 401 globalmente
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    const isBlobResponse = res.config?.responseType === 'blob';
+    if (!isBlobResponse && res.data && typeof res.data === 'object') {
+      const isWarehouseCatalog = /\/catalogos\/almacenes(?:\?|$)/.test(res.config?.url || '');
+      res.data = normalizeWarehouseNamesInData(res.data, {
+        warehouseContext: isWarehouseCatalog,
+      });
+    }
+    return res;
+  },
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('zentra_token');

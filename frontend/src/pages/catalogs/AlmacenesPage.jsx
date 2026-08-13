@@ -33,7 +33,7 @@ function AlmacenForm({ defaults, onSubmit, onCancel, loading }) {
           <label className="label">Nombre <span className="text-red-500">*</span></label>
           <input
             className={`input ${errors.nombre ? 'input-error' : ''}`}
-            placeholder="Ej: ALMACEN LIMA NORTE"
+            placeholder="Ej: LIMA NORTE"
             {...register('nombre', { required: 'Requerido' })}
           />
           {errors.nombre && <p className="error-msg">{errors.nombre.message}</p>}

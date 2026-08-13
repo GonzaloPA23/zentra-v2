@@ -30,6 +30,7 @@ const {
 const {
   expandTgAlmacenesRowsForKardex,
 } = require("../utils/registroExport");
+const { normalizeWarehouseName } = require("../utils/warehouseName");
 
 const router = express.Router();
 router.use(authMiddleware, empresaMiddleware);
@@ -2907,7 +2908,7 @@ async function buildStockInitialImportTemplateWorkbook(req, executor = pool) {
     templateSheet,
     {
       operacion: "SUMAR",
-      almacen: "ALMACEN TRES REGIONES",
+      almacen: "TRES REGIONES",
       categoria: "ABARROTES",
       sku: "AFICHE ENMICADO ABARROTES",
       codigo_lote: "",
@@ -2923,7 +2924,7 @@ async function buildStockInitialImportTemplateWorkbook(req, executor = pool) {
     templateSheet,
     {
       operacion: "SUMAR",
-      almacen: "ALMACEN TRES REGIONES",
+      almacen: "TRES REGIONES",
       categoria: "ABARROTES",
       sku: "AVENA 3 OSITOS CANELA 24X100GR",
       codigo_lote: "LOTE-2024-001",
@@ -2940,7 +2941,7 @@ async function buildStockInitialImportTemplateWorkbook(req, executor = pool) {
     templateSheet,
     {
       operacion: "SUMAR",
-      almacen: "ALMACEN CHICLAYO",
+      almacen: "CHICLAYO",
       categoria: "CONFITES",
       sku: "GALLETA CHOCODONUTS BLANCA 14X6X83GR",
       codigo_lote: "GCH-2024-A",
@@ -2956,7 +2957,7 @@ async function buildStockInitialImportTemplateWorkbook(req, executor = pool) {
     templateSheet,
     {
       operacion: "REEMPLAZAR",
-      almacen: "ALMACEN HUAMANTANGA",
+      almacen: "HUAMANTANGA",
       categoria: "",
       sku: "POLO ROJO FANNY",
       codigo_lote: "",
@@ -3713,7 +3714,7 @@ function buildStockReportRows(
 
       if (!reportMap.has(key)) {
         reportMap.set(key, {
-          almacen: entry.almacen_nombre || "",
+          almacen: normalizeWarehouseName(entry.almacen_nombre),
           zona: movement.zona || "",
           categoria: movement.categoria_nombre || "",
           tipo_mercaderia: movement.tipo_mercaderia_nombre || "",

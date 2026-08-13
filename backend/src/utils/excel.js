@@ -1,4 +1,5 @@
 const ExcelJS = require('exceljs');
+const { normalizeWarehouseName } = require('./warehouseName');
 
 function sanitizeSheetName(value = 'Datos') {
   return String(value).replace(/[\\/*?:[\]]/g, '').slice(0, 31) || 'Datos';
@@ -92,7 +93,17 @@ function prepareWorksheet(worksheet, columns = []) {
 
 function addWorksheetRows(worksheet, columns = [], rows = []) {
   rows.forEach((row) => {
-    const excelRow = worksheet.addRow(row);
+    const normalizedRow = { ...row };
+    columns.forEach((column) => {
+      if (
+        /ALMAC[EÉ]N/i.test(String(column.header || ''))
+        && typeof normalizedRow[column.key] === 'string'
+      ) {
+        normalizedRow[column.key] = normalizeWarehouseName(normalizedRow[column.key]);
+      }
+    });
+
+    const excelRow = worksheet.addRow(normalizedRow);
     excelRow.eachCell((cell, columnNumber) => {
       applyBodyStyle(cell);
 
