@@ -172,7 +172,11 @@ async function getCurrentStockAmount(
   { empresa_id, almacen_id, sku_id, lote_id },
 ) {
   const normalizedLoteId = parsePositiveInt(lote_id);
-  const [rows] = await executor.query(
+  // Bloquea la fila operativa para serializar movimientos concurrentes, pero
+  // calcula el saldo desde el historial. stock_almacen puede contener saldos
+  // antiguos desfasados por movimientos del mismo almacen registrados antes
+  // de que se corrigiera su tratamiento.
+  await executor.query(
     normalizedLoteId
       ? `SELECT cantidad
          FROM stock_almacen
@@ -188,9 +192,69 @@ async function getCurrentStockAmount(
       ? [empresa_id, almacen_id, sku_id, normalizedLoteId]
       : [empresa_id, almacen_id, sku_id],
   );
-  const stockAmount = Number(rows[0]?.cantidad || 0);
 
-  return stockAmount;
+  const jsonLotePredicate = normalizedLoteId
+    ? "CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(detalle, '$.lote_id')), '') AS UNSIGNED)=?"
+    : "(JSON_EXTRACT(detalle, '$.lote_id') IS NULL OR LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(detalle, '$.lote_id')), '')) IN ('', 'null'))";
+  const movementLotePredicate = normalizedLoteId
+    ? "sm.lote_id=?"
+    : "sm.lote_id IS NULL";
+
+  const [auditRows] = await executor.query(
+    `SELECT COALESCE(SUM(CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(detalle, '$.cantidad')), ''), '0') AS DECIMAL(18,4))), 0) AS cantidad
+     FROM audit_log
+     WHERE accion='STOCK_INITIAL'
+       AND tabla='stock_almacen'
+       AND empresa_id=?
+       AND CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(detalle, '$.almacen_id')), '') AS UNSIGNED)=?
+       AND CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(detalle, '$.sku_id')), '') AS UNSIGNED)=?
+       AND ${jsonLotePredicate}`,
+    normalizedLoteId
+      ? [empresa_id, almacen_id, sku_id, normalizedLoteId]
+      : [empresa_id, almacen_id, sku_id],
+  );
+
+  const [movementRows] = await executor.query(
+    `SELECT COALESCE(SUM(
+       CASE
+         WHEN sm.almacen_origen_id IS NOT NULL
+          AND sm.almacen_destino_id IS NOT NULL
+          AND sm.almacen_origen_id=sm.almacen_destino_id THEN
+           CASE
+             WHEN sm.tipo_movimiento='TG_INTERNO_ENTRADA' THEN sm.cantidad
+             WHEN sm.tipo_movimiento='TG_INTERNO_SALIDA' THEN -sm.cantidad
+             WHEN COALESCE(r.tipo_accion, '')='ENTRADA'
+              AND sm.tipo_movimiento IN ('INGRESO_APROBADO', 'APROBACION') THEN sm.cantidad
+             WHEN COALESCE(r.tipo_accion, '')<>'ENTRADA'
+              AND sm.tipo_movimiento IN ('SALIDA_TRANSITO', 'APROBACION') THEN -sm.cantidad
+             ELSE 0
+           END
+         ELSE
+           (CASE
+             WHEN sm.almacen_origen_id=? AND sm.tipo_movimiento IN ('APROBACION', 'SALIDA_TRANSITO', 'TG_INTERNO_SALIDA') THEN -sm.cantidad
+             WHEN sm.almacen_origen_id=? AND sm.tipo_movimiento='REVERSA_RECHAZO' THEN sm.cantidad
+             ELSE 0
+           END)
+           +
+           (CASE
+             WHEN sm.almacen_destino_id=? AND sm.tipo_movimiento IN ('APROBACION', 'INGRESO_APROBADO', 'TG_INTERNO_ENTRADA') THEN sm.cantidad
+             ELSE 0
+           END)
+       END
+     ), 0) AS cantidad
+     FROM stock_movimientos sm
+     LEFT JOIN registros r ON r.id=sm.registro_id
+     WHERE sm.empresa_id=?
+       AND sm.sku_id=?
+       AND ${movementLotePredicate}
+       AND (sm.almacen_origen_id=? OR sm.almacen_destino_id=?)
+       AND (r.id IS NULL OR r.eliminado_at IS NULL)`,
+    normalizedLoteId
+      ? [almacen_id, almacen_id, almacen_id, empresa_id, sku_id, normalizedLoteId, almacen_id, almacen_id]
+      : [almacen_id, almacen_id, almacen_id, empresa_id, sku_id, almacen_id, almacen_id],
+  );
+
+  return Number(auditRows[0]?.cantidad || 0) + Number(movementRows[0]?.cantidad || 0);
 }
 
 async function upsertStock(
@@ -515,34 +579,91 @@ router.get("/stock", async (req, res) => {
       return res.status(400).json({ mensaje: "almacen_id requerido" });
     }
 
-    const params = [almacenId];
-    let where = "sa.almacen_id=? AND sa.cantidad > 0";
-    if (req.empresa_id) {
-      where += " AND sa.empresa_id=?";
-      params.push(req.empresa_id);
-    }
-    if (categoriaId) {
-      where += " AND sk.categoria_id=?";
-      params.push(categoriaId);
-    }
+    const empresaId = await resolveEmpresaIdForWarehouse(pool, req, almacenId);
+    const params = [
+      almacenId,
+      almacenId,
+      empresaId,
+      almacenId,
+      almacenId,
+      almacenId,
+      empresaId,
+      almacenId,
+      almacenId,
+      empresaId,
+    ];
+    const categoriaFilter = categoriaId ? "AND sk.categoria_id=?" : "";
+    if (categoriaId) params.push(categoriaId);
 
     const [rows] = await pool.query(
       `SELECT
-        sa.almacen_id,
-        sa.sku_id,
-        sa.lote_id,
-        sa.cantidad AS stock_disponible,
+        ? AS almacen_id,
+        stock.sku_id,
+        stock.lote_id,
+        SUM(stock.cantidad) AS stock_disponible,
         sk.codigo AS sku_codigo,
         sk.nombre AS sku_nombre,
         sk.categoria_id,
         ca.nombre AS categoria_nombre,
         lo.codigo_lote,
         lo.fecha_vencimiento
-       FROM stock_almacen sa
-       JOIN skus sk ON sk.id = sa.sku_id
+       FROM (
+         SELECT
+           CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(a.detalle, '$.sku_id')), '') AS UNSIGNED) AS sku_id,
+           CAST(NULLIF(NULLIF(LOWER(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(a.detalle, '$.lote_id')), '')), 'null'), '') AS UNSIGNED) AS lote_id,
+           SUM(CAST(COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(a.detalle, '$.cantidad')), ''), '0') AS DECIMAL(18,4))) AS cantidad
+         FROM audit_log a
+         WHERE a.accion='STOCK_INITIAL'
+           AND a.tabla='stock_almacen'
+           AND CAST(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(a.detalle, '$.almacen_id')), '') AS UNSIGNED)=?
+           AND a.empresa_id=?
+         GROUP BY sku_id, lote_id
+
+         UNION ALL
+
+         SELECT
+           sm.sku_id,
+           sm.lote_id,
+           SUM(
+             CASE
+               WHEN sm.almacen_origen_id IS NOT NULL
+                AND sm.almacen_destino_id IS NOT NULL
+                AND sm.almacen_origen_id=sm.almacen_destino_id THEN
+                 CASE
+                   WHEN sm.tipo_movimiento='TG_INTERNO_ENTRADA' THEN sm.cantidad
+                   WHEN sm.tipo_movimiento='TG_INTERNO_SALIDA' THEN -sm.cantidad
+                   WHEN COALESCE(r.tipo_accion, '')='ENTRADA'
+                    AND sm.tipo_movimiento IN ('INGRESO_APROBADO', 'APROBACION') THEN sm.cantidad
+                   WHEN COALESCE(r.tipo_accion, '')<>'ENTRADA'
+                    AND sm.tipo_movimiento IN ('SALIDA_TRANSITO', 'APROBACION') THEN -sm.cantidad
+                   ELSE 0
+                 END
+               ELSE
+                 (CASE
+                   WHEN sm.almacen_origen_id=? AND sm.tipo_movimiento IN ('APROBACION', 'SALIDA_TRANSITO', 'TG_INTERNO_SALIDA') THEN -sm.cantidad
+                   WHEN sm.almacen_origen_id=? AND sm.tipo_movimiento='REVERSA_RECHAZO' THEN sm.cantidad
+                   ELSE 0
+                 END)
+                 +
+                 (CASE
+                   WHEN sm.almacen_destino_id=? AND sm.tipo_movimiento IN ('APROBACION', 'INGRESO_APROBADO', 'TG_INTERNO_ENTRADA') THEN sm.cantidad
+                   ELSE 0
+                 END)
+             END
+           ) AS cantidad
+         FROM stock_movimientos sm
+         LEFT JOIN registros r ON r.id=sm.registro_id
+         WHERE sm.empresa_id=?
+           AND (sm.almacen_origen_id=? OR sm.almacen_destino_id=?)
+           AND (r.id IS NULL OR r.eliminado_at IS NULL)
+         GROUP BY sm.sku_id, sm.lote_id
+       ) stock
+       JOIN skus sk ON sk.id = stock.sku_id
        JOIN categorias ca ON ca.id = sk.categoria_id
-       LEFT JOIN lotes lo ON lo.id = sa.lote_id
-       WHERE ${where}
+       LEFT JOIN lotes lo ON lo.id = stock.lote_id
+       WHERE sk.empresa_id=? ${categoriaFilter}
+       GROUP BY stock.sku_id, stock.lote_id, sk.codigo, sk.nombre,
+                sk.categoria_id, ca.nombre, lo.codigo_lote, lo.fecha_vencimiento
        HAVING stock_disponible > 0
        ORDER BY ca.nombre, sk.nombre, lo.fecha_vencimiento IS NULL, lo.fecha_vencimiento, lo.codigo_lote`,
       params,

@@ -891,6 +891,17 @@ async function attachRegistroDetails(executor, registros) {
 async function fetchRegistroRows(executor, req, { paginate = true } = {}) {
   const { fromClause, where, params, orderBy, page, limit } =
     await buildRegistroQuery(req, executor);
+  // En la tabla paginada estos resúmenes evitan traer todos los detalles. En
+  // una exportación completa attachRegistroDetails ya carga los detalles en
+  // una sola consulta, por lo que repetir tres subconsultas correlacionadas
+  // por cada guía vuelve muy lenta la descarga con miles de registros.
+  const detailSummarySelect = paginate
+    ? `${PRIMARY_SKU_EXPR} AS sku_principal_nombre,
+      ${TOTAL_CANTIDAD_EXPR} AS cantidad_total,
+      GREATEST(${DETAIL_COUNT_EXPR}, 1) AS detalles_count`
+    : `COALESCE(sk.nombre, '') AS sku_principal_nombre,
+      COALESCE(r.cantidad, 0) AS cantidad_total,
+      1 AS detalles_count`;
   const baseSelect = `SELECT r.*,
       ao.nombre AS almacen_origen,
       ad.nombre AS almacen_destino,
@@ -900,9 +911,7 @@ async function fetchRegistroRows(executor, req, { paginate = true } = {}) {
       pr.nombre AS personal_receptor_nombre,
       ind.nombre AS indicador_nombre,
       CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,'')) AS registrado_por,
-      ${PRIMARY_SKU_EXPR} AS sku_principal_nombre,
-      ${TOTAL_CANTIDAD_EXPR} AS cantidad_total,
-      GREATEST(${DETAIL_COUNT_EXPR}, 1) AS detalles_count
+      ${detailSummarySelect}
     ${fromClause}
     ${where}
     ${orderBy}`;
